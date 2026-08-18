@@ -202,10 +202,6 @@ optimality under obstacles, and the environment guarantees (the entrance and its
 neighbours are never pits, the gold is always reachable, a seed always rebuilds
 the same cave).
 
-## Video
-
-Recording of a full run: **[add the link here before submitting]**
-
 ## Group 6
 
 | Register number | Name |
