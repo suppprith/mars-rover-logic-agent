@@ -1,0 +1,4 @@
+# The simulation itself runs on the standard library, Tkinter included.
+# reportlab is only needed if you want to rebuild SUMMARY.pdf:
+#   python tools/make_summary.py
+reportlab>=4.0
