@@ -1,22 +1,3 @@
-"""The rover: read the sensors, update the knowledge base, replan, act.
-
-Priority order for each turn:
-
-  1. Sample cache on this square, collect it.
-  2. Carrying the sample, drive the shortest safe route back and dock.
-  3. Somewhere proved safe and not yet surveyed, go there.
-  4. Nothing safe left but the radiation source is pinned down and the
-     containment charge is unused, seal it and see whether that opens the
-     map up.
-  5. Still stuck, drive onto the least risky unproved square if the odds
-     are tolerable.
-  6. Otherwise cut the losses and dock with nothing.
-
-The plan is thrown away and rebuilt after every reading. That is the
-whole point: the graph the rover searches is the set of squares it has
-proved safe, and that set grows as it drives.
-"""
-
 import time
 
 from . import planner
@@ -53,8 +34,6 @@ class Agent:
         self.nodes_expanded = 0
         self.nodes_generated = 0
         self.thinking_time = 0.0
-
-    # ---- one turn ---------------------------------------------------
 
     def step(self, position, percepts):
         """Take in the world, hand back the next action."""
@@ -98,8 +77,6 @@ class Agent:
             return gamble
 
         return self._head_home("nothing safe left to try, returning to the lander")
-
-    # ---- options ----------------------------------------------------
 
     def _passable(self):
         """Cells A* is allowed to route through."""
@@ -186,8 +163,6 @@ class Agent:
         self.replans += 1
         self.nodes_expanded += result.expanded
         self.nodes_generated += result.generated
-
-    # ---- reporting --------------------------------------------------
 
     def metrics(self):
         data = {
