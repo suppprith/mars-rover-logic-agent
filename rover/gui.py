@@ -32,12 +32,12 @@ DANGER = "#e05c5c"
 
 
 class Window:
-    def __init__(self, session, delay=650, reveal=False, echo=True):
+    def __init__(self, session, delay=650, reveal=False, echo=True, paused=False):
         self.session = session
         self.delay = delay
         self.reveal = reveal
         self.echo = echo
-        self.paused = False
+        self.paused = paused
 
         size = session.size
         self.pad = 24
@@ -285,6 +285,6 @@ class Window:
         self.status.config(text="\n".join(lines))
 
 
-def launch(session, delay=650, reveal=False, echo=True):
-    Window(session, delay=delay, reveal=reveal, echo=echo).run()
+def launch(session, delay=650, reveal=False, echo=True, paused=False):
+    Window(session, delay=delay, reveal=reveal, echo=echo, paused=paused).run()
 

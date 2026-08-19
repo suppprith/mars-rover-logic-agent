@@ -26,6 +26,9 @@ def parse_args(argv=None):
     p.add_argument("--ascii", action="store_true", help="render in the terminal instead")
     p.add_argument("--headless", action="store_true", help="log only, no map")
     p.add_argument("--reveal", action="store_true", help="draw the hazards from the start")
+    p.add_argument(
+        "--paused", action="store_true", help="open paused, press space to start it moving"
+    )
     p.add_argument("--benchmark", type=int, metavar="N", help="run N maps and report averages")
     return p.parse_args(argv)
 
@@ -109,7 +112,9 @@ def main(argv=None):
         console.play(session, delay=args.delay / 1000.0, reveal=args.reveal)
         return 0
 
-    gui.launch(session, delay=args.delay, reveal=args.reveal)
+    if args.paused:
+        print("window opened paused, press space in it to start the run")
+    gui.launch(session, delay=args.delay, reveal=args.reveal, paused=args.paused)
     return 0
 
 
