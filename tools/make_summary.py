@@ -2,7 +2,7 @@
 
     python tools/make_summary.py
 
-Needs reportlab. Numbers in the complexity table come from
+Needs reportlab. The numbers in MEASURED come from
 `python run.py --benchmark 400 --seed 0`.
 """
 
@@ -10,7 +10,6 @@ import os
 import sys
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -22,23 +21,21 @@ INK = colors.HexColor("#111111")
 RULE = colors.HexColor("#999999")
 BAND = colors.HexColor("#eeeeee")
 
-title = ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=13, leading=15, textColor=INK)
-sub = ParagraphStyle("sub", fontName="Helvetica", fontSize=8, leading=10, textColor=INK)
+title = ParagraphStyle("title", fontName="Times-Bold", fontSize=14, leading=16, textColor=INK)
+sub = ParagraphStyle("sub", fontName="Times-Roman", fontSize=8.5, leading=10.5, textColor=INK)
 head = ParagraphStyle(
-    "head", fontName="Helvetica-Bold", fontSize=9, leading=11, textColor=INK, spaceBefore=5
+    "head", fontName="Times-Bold", fontSize=10, leading=12, textColor=INK, spaceBefore=6
 )
-body = ParagraphStyle(
-    "body", fontName="Helvetica", fontSize=7.4, leading=9.2, textColor=INK, alignment=TA_JUSTIFY
-)
-cell = ParagraphStyle("cell", fontName="Helvetica", fontSize=7.2, leading=8.8, textColor=INK)
-cellb = ParagraphStyle("cellb", parent=cell, fontName="Helvetica-Bold")
+cell = ParagraphStyle("cell", fontName="Times-Roman", fontSize=8, leading=9.6, textColor=INK)
+cellb = ParagraphStyle("cellb", parent=cell, fontName="Times-Bold")
+body = ParagraphStyle("body", parent=cell, fontSize=7.8, leading=9.4)
 
 
 def p(text, style=cell):
     return Paragraph(text, style)
 
 
-def grid(rows, widths, shade_first_column=True):
+def grid(rows, widths, header_row=False):
     table = Table(rows, colWidths=widths, hAlign="LEFT")
     style = [
         ("GRID", (0, 0), (-1, -1), 0.4, RULE),
@@ -48,31 +45,31 @@ def grid(rows, widths, shade_first_column=True):
         ("TOPPADDING", (0, 0), (-1, -1), 2.5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
     ]
-    if shade_first_column:
+    if header_row:
+        style.append(("BACKGROUND", (0, 0), (-1, 0), BAND))
+    else:
         style.append(("BACKGROUND", (0, 0), (0, -1), BAND))
     table.setStyle(TableStyle(style))
     return table
 
 
 def header():
-    members = (
-        "2441644 Pratyush Gupta &nbsp;&nbsp;|&nbsp;&nbsp; "
-        "2441661 Suprith R B &nbsp;&nbsp;|&nbsp;&nbsp; "
-        "2441647 Rohail Kuriakose Varghese"
-    )
     return [
         p("Autonomous Mars Rover: a propositional logic agent", title),
-        Spacer(1, 2),
+        Spacer(1, 3),
         p(
             "BCA301-5 Artificial Intelligence &nbsp;&middot;&nbsp; AI Express Hackathon "
-            "&nbsp;&middot;&nbsp; <b>Group 6</b> &nbsp;&middot;&nbsp; "
-            "Track 2: Autonomous Mars Rover (Unit 3, Propositional Logic Agent), "
-            "with A* replanning over the proved-safe squares",
+            "&nbsp;&middot;&nbsp; <b>Group 6</b><br/>"
+            "Track 2: Autonomous Mars Rover (Unit 3, Propositional Logic Agent)",
             sub,
         ),
-        Spacer(1, 1.5),
-        p(members, sub),
-        Spacer(1, 1.5),
+        Spacer(1, 2),
+        p(
+            "2441644 Pratyush Gupta &nbsp;&nbsp;|&nbsp;&nbsp; 2441661 Suprith R B "
+            "&nbsp;&nbsp;|&nbsp;&nbsp; 2441647 Rohail Kuriakose Varghese",
+            sub,
+        ),
+        Spacer(1, 2),
         p('Repository: <font face="Courier">%s</font>' % REPO, sub),
     ]
 
@@ -82,37 +79,34 @@ def peas():
         [
             p("Performance", cellb),
             p(
-                "+1000 for docking at the lander with the sample, -1000 for losing the rover, -1 per "
-                "action, -10 for firing the containment charge. Secondary measures logged every run: path cost in moves, "
-                "A* nodes expanded and generated, number of replans, clauses held, resolution steps, "
-                "reasoning time.",
+                "+1000 docking at the lander with the sample, -1000 losing the rover, -1 per action, "
+                "-10 for the containment charge. Also logged: path cost, nodes expanded and generated, "
+                "replans, clauses, resolution steps, reasoning time."
             ),
         ],
         [
             p("Environment", cellb),
             p(
-                "6x6 survey grid of safe terrain, unknown hazards and one radiation zone. Each square "
-                "outside the lander and its neighbours holds a hazard with probability 0.16, plus one "
-                "radiation zone and one sample cache. Generation "
-                "retries until the sample is reachable without crossing a hazard. Partially observable "
-                "(readings are local only), deterministic, sequential, static, discrete, single agent.",
+                "6x6 grid of safe terrain, unknown hazards and one radiation zone, plus one sample "
+                "cache. Each square beyond the lander and its neighbours holds a hazard with "
+                "probability 0.16. Generation retries until the sample is reachable without crossing "
+                "a hazard. Partially observable, deterministic, sequential, static, discrete, single "
+                "agent."
             ),
         ],
         [
             p("Actuators", cellb),
             p(
-                "Drive to an orthogonally adjacent square (north, south, east, west), Collect the "
-                "sample, Neutralise the radiation zone along a bearing with the single containment "
-                "charge, Dock at the lander.",
+                "Drive north, south, east or west to an adjacent square; Collect the sample; "
+                "Neutralise the radiation zone along a bearing with the single charge; Dock."
             ),
         ],
         [
             p("Sensors", cellb),
             p(
-                "Hazard warning (an unknown hazard is adjacent), radiation alert (the radiation zone "
-                "is adjacent), sample beacon (the cache is on this square), neutralise confirmation, "
-                "bump (drove into the edge). Nothing else is visible: the rover "
-                "never sees a square it has not parked on.",
+                "Hazard warning (hazard adjacent), radiation alert (zone adjacent), sample beacon "
+                "(cache on this square), neutralise confirmation, bump. Readings are local: the rover "
+                "never sees a square it has not parked on."
             ),
         ],
     ]
@@ -124,42 +118,58 @@ def formulation():
         [
             p("State space", cellb),
             p(
-                "Rover state is (position, knowledge base, has_sample, has_charge, source_active). The "
-                "planner searches a smaller graph: vertices are the squares currently proved safe or "
-                "already driven on, minus squares proved to hold a hazard; edges join orthogonal "
-                "neighbours. That vertex set changes after every reading, which is what forces the replan.",
+                "(position, knowledge base, has_sample, has_charge, radiation_active). The planner "
+                "searches a subgraph: vertices are squares proved safe or already driven on, less "
+                "squares proved to hold a hazard; edges join orthogonal neighbours. That vertex set "
+                "grows with every reading, which is what forces the replan."
             ),
         ],
         [
             p("Initial state", cellb),
             p(
-                "Rover at the lander (0,0) facing east, charge unused, no sample. KB holds only "
-                "Visited(0,0) plus the adjacency facts for the grid. Nothing about the hazards, the "
-                "radiation zone or the sample cache is given.",
+                "Rover at the lander (0,0), charge unused, no sample. KB holds Visited(0,0) and the "
+                "grid adjacency facts. Nothing about hazards, the radiation zone or the cache is given."
             ),
         ],
         [
             p("Goal test", cellb),
             p(
-                "Mission: Dock executed at (0,0) while has_sample. Search: n = target square, where the "
-                "target is the cheapest safe square not yet surveyed, or (0,0) once the sample is aboard.",
+                "Mission: Dock at (0,0) while has_sample. Search: n equals the target square, which is "
+                "the cheapest safe unsurveyed square, or (0,0) once the sample is aboard."
             ),
         ],
         [
             p("Path cost", cellb),
-            p(
-                "g(n) = number of moves from the current square, one unit per edge, so g(n) is the "
-                "length of the path in the search graph.",
-            ),
+            p("g(n) = number of moves from the current square, one unit per edge."),
         ],
         [
             p("Heuristic", cellb),
             p(
                 "h(n) = |x<sub>n</sub> - x<sub>goal</sub>| + |y<sub>n</sub> - y<sub>goal</sub>| , "
                 "f(n) = g(n) + h(n).<br/>"
-                "Admissible: every move changes Manhattan distance by exactly 1, so no path can be "
-                "shorter than h(n). Consistent: for adjacent n, n' , h(n) &lt;= c(n,n') + h(n') = "
-                "1 + h(n') , so A* with a closed set returns an optimal path and never reopens a node.",
+                "Admissible: each move changes Manhattan distance by exactly 1, so no path is shorter "
+                "than h(n). Consistent: h(n) &lt;= c(n,n') + h(n') = 1 + h(n') for adjacent n, n' , so "
+                "A* with a closed set is optimal and never reopens a node."
+            ),
+        ],
+        [
+            p("Propositional axioms", cellb),
+            p(
+                "W<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of H<sub>n</sub> &nbsp;&nbsp;and"
+                "&nbsp;&nbsp; A<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of Z<sub>n</sub><br/>"
+                "W hazard warning, A radiation alert, H unknown hazard, Z radiation zone. Added in CNF "
+                "the first time a square is seen, with unit clauses not H<sub>c</sub>, not "
+                "Z<sub>c</sub> for every square driven on and the observed W<sub>c</sub> or not "
+                "W<sub>c</sub>."
+            ),
+        ],
+        [
+            p("Entailment", cellb),
+            p(
+                "KB entails a query iff KB with the negated query is unsatisfiable. Tested by "
+                "resolution refutation: set of support seeded on the negated query, a relevance filter "
+                "dropping clauses over two moves from the query square, maximum clause length 8, and a "
+                "2500 step budget. Exhausting the budget returns not proved, never proved false."
             ),
         ],
         [
@@ -170,98 +180,101 @@ def formulation():
                 "Visited(c) and NoAlert(c) and Adjacent(c,n) =&gt; NoRadiation(n)<br/>"
                 "NoHazard(c) and NoRadiation(c) =&gt; Safe(c) &nbsp;&middot;&nbsp; "
                 "RadiationSealed and Cell(c) =&gt; NoRadiation(c)<br/>"
-                "Applied by forward chaining to a fixpoint, with unification against the ground "
-                "adjacency facts.",
+                "Forward chained to a fixpoint, unified against the ground adjacency facts."
             ),
         ],
         [
-            p("Propositional axioms", cellb),
+            p("Risk, no proof", cellb),
             p(
-                "W<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of H<sub>n</sub> &nbsp;&nbsp;and"
-                "&nbsp;&nbsp; A<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of Z<sub>n</sub> , where W is the "
-                "hazard warning, A the radiation alert, H an unknown hazard and Z the radiation zone. "
-                "Added in CNF the first time a square is seen, together with the unit clauses not "
-                "H<sub>c</sub>, not Z<sub>c</sub> for every square driven on and the observed "
-                "W<sub>c</sub> or not W<sub>c</sub>.",
-            ),
-        ],
-        [
-            p("Entailment", cellb),
-            p(
-                "KB entails a query iff KB together with the negated query is unsatisfiable. Tested by resolution "
-                "refutation with a set-of-support strategy seeded on the negated query, a relevance filter "
-                "that drops clauses whose symbols lie more than two moves from the query square, a "
-                "maximum clause length of 8, and a 2500 step budget. Exhausting the budget returns "
-                "&quot;not proved&quot;, so the agent can only become more cautious, never less.",
-            ),
-        ],
-        [
-            p("Risk when no proof exists", cellb),
-            p(
-                "P(H<sub>c</sub> | evidence) = [ sum of w(m) over the models that satisfy the "
-                "evidence and set H<sub>c</sub> true ] / [ sum of w(m) over every model that "
-                "satisfies the evidence ], where w(m) is the product of p over the true hazard "
-                "variables and (1-p) over the false ones, p = 0.16. Enumerated over the unproved "
-                "frontier variables only. The rover drives onto the minimum if it is at or below "
-                "0.25, otherwise it returns to the lander and docks.",
+                "P(H<sub>c</sub> | evidence) = [ sum of w(m) over models satisfying the evidence with "
+                "H<sub>c</sub> true ] / [ sum of w(m) over all models satisfying the evidence ], "
+                "w(m) = product of p over true hazard variables and (1-p) over false, p = 0.16. "
+                "Enumerated over unproved frontier variables. The rover drives onto the minimum at or "
+                "below 0.25, otherwise it returns to the lander."
             ),
         ],
     ]
-    return grid(rows, [30 * mm, 152 * mm])
+    return grid(rows, [26 * mm, 156 * mm])
 
 
-def complexity():
+def complexity(m):
     rows = [
-        [p("Component", cellb), p("Theoretical", cellb), p("Observed over 400 maps", cellb)],
+        [p("Component", cellb), p("Theoretical", cellb), p("Observed, 400 maps", cellb)],
         [
             p("A* per search"),
             p(
-                "N = n<sup>2</sup> = 36 squares, branching 4. Time O(N log N) with a closed set and a "
-                "consistent heuristic, worst case O(b<sup>d</sup>) = 4<sup>10</sup> without one. "
-                "Space O(N) = 36."
+                "N = n<sup>2</sup> = 36 squares, branching 4. O(N log N) with a closed set and a "
+                "consistent heuristic; O(b<sup>d</sup>) worst case without one. Space O(N)."
             ),
-            p("3.5 nodes expanded per search, 67.8 per map over 19.3 replans; 117.4 generated"),
+            p(
+                "%.1f expanded per search, %.1f per map over %.1f replans, %.1f generated"
+                % (m["expanded"] / m["replans"], m["expanded"], m["replans"], m["generated"])
+            ),
         ],
         [
             p("Forward chaining"),
             p(
-                "Adjacency is bounded at 4, so the rules have O(n<sup>2</sup>) ground instances. "
-                "O(n<sup>2</sup>) work per pass, O(n<sup>4</sup>) to reach the fixpoint."
+                "Adjacency bounded at 4, so O(n<sup>2</sup>) ground rule instances. O(n<sup>2</sup>) "
+                "per pass, O(n<sup>4</sup>) to fixpoint."
             ),
-            p("64 facts derived per map, 259 ground facts held at the end"),
+            p("%.0f facts derived per map, %.0f ground facts held" % (m["derived"], m["facts"])),
         ],
         [
             p("Resolution"),
             p(
-                "Propositional resolution is O(2<sup>m</sup>) in the worst case for m symbols. Here "
-                "m = 4n<sup>2</sup> = 144, cut to roughly 52 by the relevance window and then capped "
-                "by the 2500 step budget, so each query is bounded."
+                "O(2<sup>m</sup>) worst case for m symbols. m = 4n<sup>2</sup> = 144, cut to about 52 "
+                "by the relevance window, then bounded by the 2500 step budget."
             ),
-            p("106.1 queries per map, 1298 steps per query against the 2500 cap"),
+            p(
+                "%.1f queries per map, %.0f steps per query against the 2500 cap"
+                % (m["queries"], m["steps"] / m["queries"])
+            ),
         ],
         [
             p("Model counting"),
-            p(
-                "O(2<sup>k</sup>) over k unproved frontier variables, skipped entirely when "
-                "2<sup>k</sup> &gt; 65536."
-            ),
-            p("k stays in the range 2 to 9 in practice, so under 512 assignments per call"),
+            p("O(2<sup>k</sup>) over k unproved frontier variables, skipped above 2<sup>16</sup>."),
+            p("k stays between 2 and 9, so under 512 assignments per call"),
         ],
         [
-            p("Whole episode"),
-            p("Turns bounded by the 250 step cap; memory O(n<sup>2</sup>) facts plus O(n<sup>2</sup>) clauses"),
+            p("Whole mission"),
+            p("Turns bounded by the 250 step cap. Memory O(n<sup>2</sup>) facts and clauses."),
             p(
-                "21.1 turns, 19.3 moves, 190.4 clauses, 371.4 ms of reasoning per map; "
-                "94.2% of rovers survived, 64.5% recovered the sample, mean score 564.2"
+                "%.1f turns, %.1f moves, %.1f clauses, %.1f ms reasoning; %.1f%% survived, "
+                "%.1f%% recovered the sample, mean score %.1f"
+                % (
+                    m["turns"],
+                    m["moves"],
+                    m["clauses"],
+                    m["ms"],
+                    m["survived"],
+                    m["recovered"],
+                    m["score"],
+                )
             ),
         ],
     ]
-    table = grid(rows, [24 * mm, 76 * mm, 82 * mm], shade_first_column=False)
-    table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), BAND)]))
-    return table
+    return grid(rows, [24 * mm, 76 * mm, 82 * mm], header_row=True)
 
 
-def build(path):
+MEASURED = {
+    "recovered": 64.5,
+    "survived": 94.2,
+    "score": 564.2,
+    "turns": 21.1,
+    "moves": 19.3,
+    "replans": 19.3,
+    "expanded": 67.8,
+    "generated": 117.4,
+    "clauses": 190.4,
+    "facts": 259.0,
+    "derived": 64.0,
+    "queries": 106.1,
+    "steps": 137696.0,
+    "ms": 354.7,
+}
+
+
+def build(path, m=MEASURED):
     doc = SimpleDocTemplate(
         path,
         pagesize=A4,
@@ -269,7 +282,7 @@ def build(path):
         rightMargin=14 * mm,
         topMargin=12 * mm,
         bottomMargin=10 * mm,
-        title="Autonomous Mars Rover logical agent, technical summary",
+        title="Autonomous Mars Rover, technical summary",
         author="Group 6",
     )
     story = []
@@ -281,18 +294,17 @@ def build(path):
     story.append(p("2. Core algorithmic formulation", head))
     story.append(Spacer(1, 2))
     story.append(formulation())
-    story.append(p("3. Complexity analysis, theory against measurement", head))
+    story.append(p("3. Complexity, theory against measurement", head))
     story.append(Spacer(1, 2))
-    story.append(complexity())
-    story.append(Spacer(1, 4))
+    story.append(complexity(m))
+    story.append(Spacer(1, 5))
     story.append(
         p(
-            "Measurements reproduce with <font face=\"Courier\">python run.py --benchmark 400 "
-            "--seed 0</font> on Python 3.11. The recorded demo run is "
-            "<font face=\"Courier\">python run.py --seed 114 --delay 2400</font>: resolution proves a "
-            "hazard at (2,0), model checking pins the radiation zone at "
-            "(1,1), 19 turns, 16 moves, 47 nodes expanded, 34 resolution queries with 2 proofs, "
-            "final score 971.",
+            'Measurements: <font face="Courier">python run.py --benchmark 400 --seed 0</font> on '
+            'Python 3.11. Recorded run: <font face="Courier">python run.py --seed 114 --delay 2400'
+            "</font>, where resolution proves a hazard at (2,0) and model checking pins the radiation "
+            "zone at (1,1). 19 turns, 16 moves, 47 nodes expanded, 34 resolution queries, 2 proofs, "
+            "score 971.",
             body,
         )
     )

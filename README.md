@@ -164,7 +164,7 @@ mean nodes expanded   67.8
 mean nodes generated  117.4
 mean clauses          190.4
 mean resolution steps 137696 over 106.1 queries
-mean reasoning time   371.4 ms per map
+mean reasoning time   354.7 ms per map
 ```
 
 Reproduce with `python run.py --benchmark 400 --seed 0`.
