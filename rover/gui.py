@@ -1,9 +1,10 @@
 """Tkinter view of the survey grid.
 
-Left half is the grid the rover drives. Right half is the live read-out
-of its state and the counters. Every line the window draws also goes to
-stdout, so putting the terminal next to the window gives you the map and
-the reasoning trace side by side.
+Three panes: the grid the rover drives, the live read-out of its state
+and counters, and a mirror of the reasoning log. Every line in that log
+also goes to stdout, so the terminal trace still works as before; the
+pane just means the window is readable on its own when the terminal is
+hidden behind it.
 
 Keys: space pauses and resumes, right arrow key steps once while paused,
 r reveals the hazards, q quits.
@@ -22,8 +23,8 @@ FILL = {
     "unknown": "#3a2f1e",
     "safe": "#1d3a2c",
     "seen": "#24303f",
-    "crevasse": "#4a1f24",
-    "source": "#43244a",
+    "hazard": "#4a1f24",
+    "radiation": "#43244a",
 }
 
 ACCENT = "#e2b33c"
@@ -73,6 +74,28 @@ class Window:
         )
         self.status.pack(fill="both", expand=True, padx=12, pady=12)
 
+        self.logbox = tk.Text(
+            self.root,
+            width=64,
+            bg=PANEL,
+            fg=TEXT,
+            insertbackground=TEXT,
+            font=("Consolas", 9),
+            wrap="none",
+            relief="flat",
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        self.logbox.grid(row=0, column=2, sticky="nsew", padx=(0, 10), pady=10)
+        self.logbox.tag_configure("kb", foreground="#63c08a")
+        self.logbox.tag_configure("act", foreground=PATH)
+        self.logbox.tag_configure("env", foreground=ACCENT)
+        self.logbox.insert("end", "reasoning log\n\n")
+        self.logbox.configure(state="disabled")
+        self.root.grid_columnconfigure(2, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
+
         self.root.bind("<space>", self._toggle)
         self.root.bind("<Right>", lambda e: self._once())
         self.root.bind("r", self._flip_reveal)
@@ -102,7 +125,24 @@ class Window:
         for line in self.session.advance():
             if self.echo:
                 print(line, flush=True)
+            self._log(line)
         self.draw()
+
+    def _log(self, line):
+        """Mirror one log line into the pane on the right.
+
+        The terminal is not always visible when the window is being
+        recorded, so the window carries its own copy of the trace.
+        """
+        tag = ""
+        for marker in ("kb", "act", "env"):
+            if line[6:].startswith("  %s  |" % marker) or line[6:].startswith("  %s |" % marker):
+                tag = marker
+                break
+        self.logbox.configure(state="normal")
+        self.logbox.insert("end", line + "\n", tag)
+        self.logbox.see("end")
+        self.logbox.configure(state="disabled")
 
     def _toggle(self, _event=None):
         self.paused = not self.paused
@@ -127,7 +167,7 @@ class Window:
     def draw(self):
         self.canvas.delete("all")
         session = self.session
-        risk = session.agent.kb.crevasse_risk()
+        risk = session.agent.kb.hazard_risk()
 
         for x in range(session.size):
             for y in range(session.size):
@@ -148,10 +188,10 @@ class Window:
         self.canvas.create_rectangle(l, t, r, b, fill=FILL[state], outline=GRID_LINE, width=1)
 
         marks = []
-        if cell in kb.trembling:
-            marks.append("tremor")
-        if cell in kb.irradiated:
-            marks.append("geiger")
+        if cell in kb.warned:
+            marks.append("warning")
+        if cell in kb.alerted:
+            marks.append("alert")
         if marks:
             self.canvas.create_text(
                 (l + r) / 2,
@@ -165,7 +205,7 @@ class Window:
             self.canvas.create_text(
                 (l + r) / 2,
                 b - 14,
-                text="crevasse %.0f%%" % (risk[cell] * 100),
+                text="hazard %.0f%%" % (risk[cell] * 100),
                 fill=ACCENT,
                 font=("Consolas", 8),
             )
@@ -173,25 +213,27 @@ class Window:
             self.canvas.create_text(
                 (l + r) / 2, b - 14, text="proved safe", fill="#63c08a", font=("Consolas", 8)
             )
-        elif state == "crevasse":
+        elif state == "hazard":
             self.canvas.create_text(
-                (l + r) / 2, b - 14, text="crevasse proved", fill=DANGER, font=("Consolas", 8)
+                (l + r) / 2, b - 14, text="hazard proved", fill=DANGER, font=("Consolas", 8)
             )
 
         if self.reveal:
             hidden = []
-            if cell in terrain.crevasses:
-                hidden.append("CREVASSE")
-            if cell == terrain.source:
-                hidden.append("RADIATION" if terrain.source_active else "sealed source")
+            # Ground truth, not anything the rover worked out. Labelled so
+            # nobody reads a revealed square as a claim the agent made.
+            if cell in terrain.hazards:
+                hidden.append("actual hazard")
+            if cell == terrain.radiation:
+                hidden.append("actual radiation" if terrain.radiation_active else "zone neutralised")
             if cell == terrain.sample and not terrain.has_sample:
-                hidden.append("SAMPLE")
+                hidden.append("actual sample")
             if hidden:
                 self.canvas.create_text(
                     (l + r) / 2,
                     (t + b) / 2 + 2,
                     text="\n".join(hidden),
-                    fill=DANGER if "CREVASSE" in hidden or "RADIATION" in hidden else ACCENT,
+                    fill=DANGER if any("actual" in h for h in hidden[:1]) else ACCENT,
                     font=("Consolas", 9, "bold"),
                 )
 
@@ -249,7 +291,7 @@ class Window:
             "score        %d" % terrain.score,
             "sample       %s" % ("aboard" if terrain.has_sample else "not found"),
             "charge       %s" % ("ready" if terrain.has_charge else "spent"),
-            "radiation    %s" % ("active" if terrain.source_active else "sealed"),
+            "radiation    %s" % ("active" if terrain.radiation_active else "sealed"),
             "",
             "search",
             "  nodes expanded   %d" % m["nodes_expanded"],
@@ -276,6 +318,9 @@ class Window:
                 label = "%s %s" % (decision.action, decision.argument)
             lines.append("last move: %s" % label)
             lines.append("why: %s" % decision.reason)
+        if self.reveal:
+            lines.append("hazards revealed: ground truth, not inferred")
+            lines.append("")
         if session.outcome:
             lines.append("")
             lines.append("outcome: %s" % session.outcome)
