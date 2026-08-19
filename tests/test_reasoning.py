@@ -38,6 +38,38 @@ class Resolution(unittest.TestCase):
         self.assertFalse(prover.entails(kb, neg("C2,1")))
 
 
+class SearchOrder(unittest.TestCase):
+    """The budget has to be spent where the refutation actually is.
+
+    Resolving a clause against the whole knowledge base, and expanding
+    the support set first in first out, used to burn the step budget
+    before reaching proofs that were only a few unit resolutions away.
+    """
+
+    def test_a_square_pinned_by_several_readings_is_proved(self):
+        kb = bic("W1,2", ["H0,2", "H1,1", "H1,3", "H2,2"])
+        kb += [clause("W1,2"), clause(neg("H0,2")), clause(neg("H1,1")), clause(neg("H1,3"))]
+        prover = logic.Prover()
+        self.assertTrue(prover.entails(kb, "H2,2"))
+        self.assertLess(prover.steps, 200)
+
+    def test_the_proof_survives_a_knowledge_base_full_of_noise(self):
+        kb = bic("W1,2", ["H0,2", "H1,1", "H1,3", "H2,2"])
+        kb += [clause("W1,2"), clause(neg("H0,2")), clause(neg("H1,1")), clause(neg("H1,3"))]
+        for x in range(3, 9):
+            for y in range(3, 9):
+                kb += bic("W%d,%d" % (x, y), ["H%d,%d" % (x + 1, y), "H%d,%d" % (x, y + 1)])
+        prover = logic.Prover()
+        self.assertTrue(prover.entails(kb, "H2,2"))
+
+    def test_an_unentailed_query_is_still_refused(self):
+        kb = bic("W1,2", ["H0,2", "H1,1", "H1,3", "H2,2"])
+        kb += [clause("W1,2"), clause(neg("H0,2"))]
+        prover = logic.Prover()
+        self.assertFalse(prover.entails(kb, "H2,2"))
+        self.assertFalse(prover.entails(kb, neg("H2,2")))
+
+
 class ForwardChaining(unittest.TestCase):
     def test_a_rule_fires_once_its_premises_are_present(self):
         kb = fol.FolKB(fol.TERRAIN_RULES)

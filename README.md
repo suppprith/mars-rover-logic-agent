@@ -154,18 +154,20 @@ line to the next candidate.
 400 randomly generated 6x6 maps, hazard probability 0.16, seeds 0 to 399:
 
 ```
-sample recovered      64.5%
-rover survived        94.2%
-mean score            564.2
+sample recovered      63.5%
+rover survived        93.2%
+mean score            544.2
 mean turns            21.1
 mean path cost        19.3 moves
 mean replans          19.3
-mean nodes expanded   67.8
-mean nodes generated  117.4
-mean clauses          190.4
-mean resolution steps 137696 over 106.1 queries
-mean reasoning time   354.7 ms per map
+mean nodes expanded   67.4
+mean nodes generated  117.2
+mean clauses          190.7
+mean resolution steps 91564 over 77.9 queries
 ```
+
+Reasoning time is around 0.3 to 0.5 seconds per map and moves with machine
+load, so the step counts above are the number to compare against, not the clock.
 
 Reproduce with `python run.py --benchmark 400 --seed 0`.
 

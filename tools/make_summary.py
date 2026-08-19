@@ -239,13 +239,12 @@ def complexity(m):
             p("Whole mission"),
             p("Turns bounded by the 250 step cap. Memory O(n<sup>2</sup>) facts and clauses."),
             p(
-                "%.1f turns, %.1f moves, %.1f clauses, %.1f ms reasoning; %.1f%% survived, "
+                "%.1f turns, %.1f moves, %.1f clauses; %.1f%% survived, "
                 "%.1f%% recovered the sample, mean score %.1f"
                 % (
                     m["turns"],
                     m["moves"],
                     m["clauses"],
-                    m["ms"],
                     m["survived"],
                     m["recovered"],
                     m["score"],
@@ -257,20 +256,19 @@ def complexity(m):
 
 
 MEASURED = {
-    "recovered": 64.5,
-    "survived": 94.2,
-    "score": 564.2,
+    "recovered": 63.5,
+    "survived": 93.2,
+    "score": 544.2,
     "turns": 21.1,
     "moves": 19.3,
     "replans": 19.3,
-    "expanded": 67.8,
-    "generated": 117.4,
-    "clauses": 190.4,
+    "expanded": 67.4,
+    "generated": 117.2,
+    "clauses": 190.7,
     "facts": 259.0,
     "derived": 64.0,
-    "queries": 106.1,
-    "steps": 137696.0,
-    "ms": 354.7,
+    "queries": 77.9,
+    "steps": 91564.0,
 }
 
 
@@ -303,7 +301,7 @@ def build(path, m=MEASURED):
             'Measurements: <font face="Courier">python run.py --benchmark 400 --seed 0</font> on '
             'Python 3.11. Recorded run: <font face="Courier">python run.py --seed 114 --delay 2400'
             "</font>, where resolution proves a hazard at (2,0) and model checking pins the radiation "
-            "zone at (1,1). 19 turns, 16 moves, 47 nodes expanded, 34 resolution queries, 2 proofs, "
+            "zone at (1,1). 19 turns, 16 moves, 47 nodes expanded, 14 resolution queries, 3 proofs, "
             "score 971.",
             body,
         )

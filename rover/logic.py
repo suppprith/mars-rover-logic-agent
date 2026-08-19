@@ -1,15 +1,16 @@
 """Propositional clauses and a resolution theorem prover.
 
-A literal is a string. A leading "~" negates it, so "P2,1" and "~P2,1"
+A literal is a string. A leading "~" negates it, so "H2,1" and "~H2,1"
 are complements. A clause is a frozenset of literals, read as a
 disjunction. A knowledge base is a list of clauses, read as a
 conjunction.
 
-Proving that the terrain is safe at some cell means proving KB entails
-~P(cell). Resolution does that by refutation: assume the opposite, add
-it to the KB, and try to derive the empty clause.
+Proving a square safe means proving that the KB entails ~H(square).
+Resolution does that by refutation: assume the opposite, add it to the
+KB, and try to derive the empty clause.
 """
 
+import heapq
 import itertools
 
 MAX_CLAUSE_LEN = 8
@@ -67,6 +68,15 @@ class Prover:
     than MAX_CLAUSE_LEN are dropped, and the whole thing gives up after
     a step budget. Giving up is reported as "not proved", never as
     "proved false", so a timeout can only make the agent more cautious.
+
+    Two things decide whether the budget is enough. Clauses are indexed
+    by literal, so a clause is only ever resolved against clauses holding
+    the complement of one of its literals rather than against the whole
+    knowledge base. And the set of support is a priority queue ordered by
+    clause length, so short clauses are expanded first: the empty clause
+    is what we are looking for, and short clauses are the ones close to
+    it. Plain FIFO order spends the budget on long clauses and misses
+    refutations that are a few unit resolutions away.
     """
 
     def __init__(self, max_steps=2500):
@@ -84,16 +94,19 @@ class Prover:
         if goal in clauses:
             return False
 
-        support = [goal]
+        index = {}
+        for cl in clauses:
+            for lit in cl:
+                index.setdefault(lit, []).append(cl)
+
         seen = set(clauses) | {goal}
+        tie = 0
+        support = [(len(goal), tie, goal)]
         budget = self.max_steps
 
         while support and budget > 0:
-            current = support.pop(0)
-            partners = list(clauses) + support
-            # Unit clauses first: they shrink the resolvent every time.
-            partners.sort(key=len)
-            for other in partners:
+            _, _, current = heapq.heappop(support)
+            for other in self._partners(index, current):
                 budget -= 1
                 self.steps += 1
                 if budget <= 0:
@@ -105,9 +118,31 @@ class Prover:
                     if len(resolvent) > MAX_CLAUSE_LEN or resolvent in seen:
                         continue
                     seen.add(resolvent)
-                    support.append(resolvent)
-            clauses.append(current)
+                    tie += 1
+                    heapq.heappush(support, (len(resolvent), tie, resolvent))
+            # Only once a support clause has been expanded does it become
+            # available as a partner, which is what stops any pair being
+            # tried twice while still trying every pair.
+            for lit in current:
+                index.setdefault(lit, []).append(current)
         return False
+
+    @staticmethod
+    def _partners(index, current):
+        """Clauses that can actually resolve against `current`.
+
+        Anything without the complement of one of these literals cannot
+        produce a resolvent, so it is not worth a step of the budget.
+        """
+        out = []
+        picked = set()
+        for lit in current:
+            for other in index.get(neg(lit), ()):
+                if other not in picked:
+                    picked.add(other)
+                    out.append(other)
+        out.sort(key=len)
+        return out
 
     def _restrict(self, kb, focus):
         """Keep only the clauses that can matter to the query.
