@@ -17,7 +17,7 @@ the route gets thrown out and rebuilt on the next turn.
 
 ## Running it
 
-Python 3.9 or newer. The simulation itself needs nothing outside the standard
+Python or newer. The simulation itself needs nothing outside the standard
 library.
 
 ```bash
