@@ -45,8 +45,8 @@ def resolve(a, b):
 def biconditional_clauses(head, body):
     """Clauses for `head <=> body1 or body2 or ...`.
 
-    Used for the sensor axioms: a square reads a tremor exactly when at
-    least one neighbour holds a crevasse.
+    Used for the sensor axioms: a square reads a warning exactly when at
+    least one neighbour holds a hazard.
     """
     out = [frozenset([neg(head)] + list(body))]
     for lit in body:
@@ -135,9 +135,9 @@ def model_count(symbols, constraints, prior=0.5, limit=1 << 16):
     assignments that satisfy every constraint are summed. What comes back
     is P(symbol is true | constraints) for each symbol.
 
-    Uniform counting would answer a different question. With one tremor
+    Uniform counting would answer a different question. With one warning
     and three unknown neighbours it calls every one of them 57% likely,
-    because it treats "all three are crevasses" as being just as plausible
+    because it treats "all three are hazards" as being just as plausible
     as "exactly one is". Weighting by the generation probability fixes
     that and gives the textbook numbers.
     """

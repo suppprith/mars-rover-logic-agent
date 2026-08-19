@@ -10,10 +10,10 @@ from .agent import Agent
 from .world import Terrain
 
 READOUT = {
-    "tremor": "seismic tremor",
-    "geiger": "radiation",
+    "warning": "hazard warning",
+    "alert": "radiation alert",
     "signal": "sample beacon",
-    "spike": "telemetry spike",
+    "spike": "zone neutralised",
 }
 
 
@@ -113,10 +113,10 @@ class Session:
         kb = self.agent.kb
         if cell in kb.visited:
             return "seen"
-        if cell in kb.known_crevasses():
-            return "crevasse"
-        if kb.source_location() == cell:
-            return "source"
+        if cell in kb.known_hazards():
+            return "hazard"
+        if kb.radiation_location() == cell:
+            return "radiation"
         if kb.safe(cell):
             return "safe"
         if cell in kb.frontier():

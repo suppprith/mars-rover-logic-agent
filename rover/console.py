@@ -13,8 +13,8 @@ GLYPH = {
     "unknown": "??",
     "safe": "ok",
     "seen": "..",
-    "crevasse": "XX",
-    "source": "RR",
+    "hazard": "XX",
+    "radiation": "RR",
 }
 
 
@@ -32,11 +32,11 @@ def board(session, reveal=False):
             cell = (x, y)
             if cell == terrain.rover:
                 token = "@@"
-            elif reveal and cell in terrain.crevasses:
+            elif reveal and cell in terrain.hazards:
                 token = "XX"
             elif reveal and cell == terrain.sample and not terrain.has_sample:
                 token = "$$"
-            elif reveal and cell == terrain.source and terrain.source_active:
+            elif reveal and cell == terrain.radiation and terrain.radiation_active:
                 token = "WW"
             else:
                 token = GLYPH[session.belief(cell)]
@@ -50,7 +50,7 @@ def board(session, reveal=False):
 def legend():
     return (
         "@@ rover   ok proved safe   .. surveyed   ?? frontier   "
-        "XX crevasse   RR radiation   $$ sample"
+        "XX hazard   RR radiation   $$ sample"
     )
 
 

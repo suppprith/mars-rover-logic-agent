@@ -2,10 +2,10 @@
 
 Coordinates are (x, y) with the origin at the bottom-left. The lander
 sits at (0, 0), the rover starts there facing east, and that square plus
-its neighbours are guaranteed clear of crevasses and radiation.
+its neighbours are guaranteed clear of hazards and radiation.
 
-Three things are hidden in the grid: crevasses, which end the mission if
-the rover drives into one; a single radiation source, which does the
+Three things are hidden in the grid: hazards, which end the mission if
+the rover drives into one; a single radiation zone, which does the
 same; and one sample cache the rover has to collect and carry back to
 the lander.
 """
@@ -43,7 +43,7 @@ class Terrain:
     """Environment state plus the rules for acting on it.
 
     The generator retries until the sample can be reached without crossing
-    a crevasse or the radiation source, so every run has a winning line
+    a hazard or the radiation zone, so every run has a winning line
     available. That keeps the demo honest: when a run ends badly it is the
     reasoning that failed, not the dice.
     """
@@ -60,13 +60,13 @@ class Terrain:
             if self._generate():
                 break
         else:
-            raise RuntimeError("could not build a solvable terrain, try a lower --crevasse-prob")
+            raise RuntimeError("could not build a solvable terrain, try a lower --hazard-prob")
 
         self.rover = START
         self.facing = "east"
         self.has_charge = True
         self.has_sample = False
-        self.source_active = True
+        self.radiation_active = True
         self.operational = True
         self.docked = False
         self.score = 0
@@ -80,19 +80,19 @@ class Terrain:
         safe_zone = {START} | set(neighbours(START, size))
         cells = [(x, y) for x in range(size) for y in range(size)]
 
-        self.crevasses = set()
+        self.hazards = set()
         for c in cells:
             if c not in safe_zone and self.rng.random() < self.hazard_prob:
-                self.crevasses.add(c)
+                self.hazards.add(c)
 
-        free = [c for c in cells if c not in self.crevasses and c != START]
+        free = [c for c in cells if c not in self.hazards and c != START]
         if not free:
             return False
 
         far = [c for c in free if c not in safe_zone]
-        self.source = self.rng.choice(far or free)
+        self.radiation = self.rng.choice(far or free)
 
-        cache_options = [c for c in free if c != self.source]
+        cache_options = [c for c in free if c != self.radiation]
         if not cache_options:
             return False
         self.sample = self.rng.choice(cache_options)
@@ -100,7 +100,7 @@ class Terrain:
         return self._reachable(self.sample)
 
     def _reachable(self, target):
-        blocked = self.crevasses | {self.source}
+        blocked = self.hazards | {self.radiation}
         seen = {START}
         queue = deque([START])
         while queue:
@@ -119,8 +119,8 @@ class Terrain:
         cell = self.rover
         adj = neighbours(cell, self.size)
         p = {
-            "tremor": any(n in self.crevasses for n in adj),
-            "geiger": self.source_active and any(n == self.source for n in adj),
+            "warning": any(n in self.hazards for n in adj),
+            "alert": self.radiation_active and any(n == self.radiation for n in adj),
             "signal": (not self.has_sample) and cell == self.sample,
             "spike": self.spike,
             "bump": self.bump,
@@ -162,14 +162,14 @@ class Terrain:
         self.rover = target
         self.score -= MOVE_COST
 
-        if target in self.crevasses:
+        if target in self.hazards:
             self.operational = False
             self.score -= LOSS_PENALTY
-            return "dropped into the crevasse at %s, rover lost" % (target,)
-        if self.source_active and target == self.source:
+            return "drove into the hazard at %s, rover lost" % (target,)
+        if self.radiation_active and target == self.radiation:
             self.operational = False
             self.score -= LOSS_PENALTY
-            return "drove onto the radiation source at %s, rover lost" % (target,)
+            return "drove into the radiation zone at %s, rover lost" % (target,)
         return "moved to %s" % (target,)
 
     def _collect(self):
@@ -194,10 +194,10 @@ class Terrain:
             x, y = x + dx, y + dy
             if not (0 <= x < self.size and 0 <= y < self.size):
                 return "charge ran off the survey area, the %s line is clear" % direction
-            if self.source_active and (x, y) == self.source:
-                self.source_active = False
+            if self.radiation_active and (x, y) == self.radiation:
+                self.radiation_active = False
                 self.spike = True
-                return "charge sealed the radiation source at %s" % ((x, y),)
+                return "charge neutralised the radiation zone at %s" % ((x, y),)
 
     def _dock(self):
         self.score -= MOVE_COST
@@ -216,10 +216,10 @@ class Terrain:
         return self.docked or not self.operational
 
     def hazard_at(self, cell):
-        if cell in self.crevasses:
-            return "crevasse"
-        if self.source_active and cell == self.source:
-            return "source"
+        if cell in self.hazards:
+            return "hazard"
+        if self.radiation_active and cell == self.radiation:
+            return "radiation"
         if cell == self.sample and not self.has_sample:
             return "sample"
         return None
@@ -235,10 +235,10 @@ class Terrain:
                 if cell == self.rover:
                     marks.append("A")
                 if reveal:
-                    if cell in self.crevasses:
+                    if cell in self.hazards:
                         marks.append("P")
-                    if cell == self.source:
-                        marks.append("W" if self.source_active else "w")
+                    if cell == self.radiation:
+                        marks.append("W" if self.radiation_active else "w")
                     if cell == self.sample and not self.has_sample:
                         marks.append("G")
                 row.append("".join(marks).ljust(3) if marks else " . ")

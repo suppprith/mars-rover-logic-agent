@@ -12,13 +12,13 @@ from rover.logic import clause, neg
 
 
 class Resolution(unittest.TestCase):
-    def test_no_tremor_clears_the_neighbours(self):
+    def test_no_warning_clears_the_neighbours(self):
         kb = bic("T0,0", ["C1,0", "C0,1"]) + [clause(neg("T0,0"))]
         prover = logic.Prover()
         self.assertTrue(prover.entails(kb, neg("C1,0")))
         self.assertTrue(prover.entails(kb, neg("C0,1")))
 
-    def test_a_tremor_alone_proves_nothing_about_one_square(self):
+    def test_a_warning_alone_proves_nothing_about_one_square(self):
         kb = bic("T0,0", ["C1,0", "C0,1"]) + [clause("T0,0")]
         prover = logic.Prover()
         self.assertFalse(prover.entails(kb, "C1,0"))
@@ -44,20 +44,20 @@ class ForwardChaining(unittest.TestCase):
         kb.tell(("Cell", "0,0"))
         kb.tell(("Adjacent", "0,0", "1,0"))
         kb.tell(("Visited", "0,0"))
-        kb.tell(("NoTremor", "0,0"))
-        kb.tell(("NoGeiger", "0,0"))
+        kb.tell(("NoWarning", "0,0"))
+        kb.tell(("NoAlert", "0,0"))
         kb.forward_chain()
         self.assertTrue(kb.holds(("Safe", "1,0")))
 
-    def test_a_geiger_reading_blocks_the_safety_conclusion(self):
+    def test_an_alert_blocks_the_safety_conclusion(self):
         kb = fol.FolKB(fol.TERRAIN_RULES)
         kb.tell(("Cell", "0,0"))
         kb.tell(("Adjacent", "0,0", "1,0"))
         kb.tell(("Visited", "0,0"))
-        kb.tell(("NoTremor", "0,0"))
-        kb.tell(("Geiger", "0,0"))
+        kb.tell(("NoWarning", "0,0"))
+        kb.tell(("Alert", "0,0"))
         kb.forward_chain()
-        self.assertTrue(kb.holds(("NoCrevasse", "1,0")))
+        self.assertTrue(kb.holds(("NoHazard", "1,0")))
         self.assertFalse(kb.holds(("Safe", "1,0")))
 
     def test_unify_refuses_to_bind_one_variable_two_ways(self):
@@ -79,10 +79,10 @@ class ModelCounting(unittest.TestCase):
     def test_pinning_the_source_needs_a_single_survivor(self):
         kb = KnowledgeBase(4)
         kb.perceive((0, 0), _percepts())
-        self.assertIsNone(kb.source_location())
-        kb.perceive((1, 0), _percepts(geiger=True))
-        kb.perceive((0, 1), _percepts(geiger=True))
-        self.assertEqual(kb.source_location(), (1, 1))
+        self.assertIsNone(kb.radiation_location())
+        kb.perceive((1, 0), _percepts(alert=True))
+        kb.perceive((0, 1), _percepts(alert=True))
+        self.assertEqual(kb.radiation_location(), (1, 1))
 
 
 class Safety(unittest.TestCase):
@@ -91,17 +91,17 @@ class Safety(unittest.TestCase):
         kb.perceive((0, 0), _percepts())
         self.assertEqual(kb.safe_cells(), {(0, 0), (1, 0), (0, 1)})
 
-    def test_a_tremor_stops_the_rover_calling_a_square_safe(self):
+    def test_a_warning_stops_the_rover_calling_a_square_safe(self):
         kb = KnowledgeBase(4)
-        kb.perceive((0, 0), _percepts(tremor=True))
+        kb.perceive((0, 0), _percepts(warning=True))
         self.assertEqual(kb.safe_cells(), {(0, 0)})
-        self.assertGreater(max(kb.crevasse_risk().values()), 0.16)
+        self.assertGreater(max(kb.hazard_risk().values()), 0.16)
 
 
-def _percepts(tremor=False, geiger=False, signal=False, spike=False):
+def _percepts(warning=False, alert=False, signal=False, spike=False):
     return {
-        "tremor": tremor,
-        "geiger": geiger,
+        "warning": warning,
+        "alert": alert,
         "signal": signal,
         "spike": spike,
         "bump": False,

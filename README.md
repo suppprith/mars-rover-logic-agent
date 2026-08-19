@@ -4,11 +4,10 @@ BCA301-5 Artificial Intelligence, AI Express Hackathon. Group 6.
 **Track 2: Autonomous Mars Rover (Unit 3, Propositional Logic Agent).**
 
 A rover is set down at the lander in the corner of a 6x6 survey grid it cannot
-see. Crevasses are scattered through it, one radiation source sits somewhere in
+see. Unknown hazards are scattered through it, one radiation zone sits somewhere in
 the field, and a sample cache is waiting to be collected. The rover only ever
-gets readings from the square it is parked on: a seismic tremor if a crevasse is
-next door, a Geiger reading if the radiation source is, a beacon if the sample
-is underfoot. From that it has to work out which squares are safe to drive on,
+gets readings from the square it is parked on: a hazard warning if a hazard is
+next door, a radiation alert if the zone is, a beacon if the sample is underfoot. From that it has to work out which squares are safe to drive on,
 collect the sample, and get back to the lander in one piece.
 
 Two things are happening at once, and the point of the project is that they feed
@@ -26,17 +25,17 @@ python run.py
 ```
 
 That opens the Tkinter window and prints the reasoning log to the terminal at
-the same time. Put the two side by side and you can watch the rover move on the
-left and read why it moved on the right.
+the same time. The window carries its own copy of the log in a pane on the
+right, so the run is readable even when the terminal is hidden behind it.
 
 ```bash
 python run.py --seed 114 --delay 1800
 ```
 
-Seed 114 is the run we recorded. The rover proves a crevasse at (2, 0) by
-resolution, works out by model checking that the radiation source can only be at
-(1, 1) and seals it with its containment charge, then drives up the left edge to
-the sample at (1, 4) and back to the lander. Nineteen turns, final score 971. A
+Seed 114 is the run we recorded. The rover proves a hazard at (2, 0) by
+resolution, works out by model checking that the radiation zone can only be at
+(1, 1) and neutralises it with its containment charge, then drives up the left
+edge to the sample at (1, 4) and back to the lander. Nineteen turns, final score 971. A
 delay of 1800 ms stretches it to roughly forty seconds, which fits the video.
 
 Other flags:
@@ -59,8 +58,8 @@ Keys inside the window: space pauses, right arrow steps once while paused,
 The grid shows what the rover believes, not what is really there. Grey squares
 are unsurveyed and unreached. Green squares have been proved safe. Blue squares
 have been driven on. An amber square is on the frontier with no proof either
-way, and it carries the rover's estimate of the chance it holds a crevasse. Red
-means a crevasse has been proved. The blue line is the current A* route, and a
+way, and it carries the rover's estimate of the chance it holds a hazard. Red
+means a hazard has been proved. The blue line is the current A* route, and a
 dashed red line is the containment charge being fired.
 
 The panel on the right carries the live counters: nodes expanded and generated,
@@ -73,31 +72,32 @@ queries and proofs, and the reason behind the last action.
    base.
 2. Forward chain the first-order rules until nothing new comes out.
 3. Run resolution on the frontier squares the easy rules could not settle.
-4. Check whether the radiation source has been narrowed down to one square.
+4. Check whether the radiation zone has been narrowed down to one square.
 5. Pick an action, in this order:
    - sample cache underfoot, collect it
    - carrying the sample, A* back to the lander and dock
    - somewhere proved safe and not yet surveyed, A* there
-   - stuck but the source is located and the charge is unused, seal it
-   - still stuck, drive onto the least likely crevasse if the estimate is under
-     25%
+   - stuck but the radiation zone is located and the charge is unused, seal it
+   - still stuck, drive onto the least likely hazard if the estimate is under 25%
    - otherwise drive home and dock with nothing
 
 Step 5 runs from scratch every turn. Nothing is cached between turns except the
 knowledge itself, which is what makes the replanning visible: watch the blue
-line jump to a different corner of the map the moment a tremor rules the old
-route out.
+line jump to a different corner of the map the moment a hazard warning rules the
+old route out.
 
 ## The three reasoners
 
 **Propositional resolution** (`rover/logic.py`) is the core of Track 2. Each
-square gets a symbol `Cx,y` for a crevasse and `Rx,y` for the radiation source,
-and every square the rover parks on contributes the sensor axiom
+square gets a symbol `Hx,y` for an unknown hazard and `Zx,y` for a radiation
+zone, and every square the rover parks on contributes the sensor axiom
 
 ```
-Tx,y  <=>  C(n1) or C(n2) or ...      over its neighbours
-Gx,y  <=>  R(n1) or R(n2) or ...
+Wx,y  <=>  H(n1) or H(n2) or ...      over its neighbours
+Ax,y  <=>  Z(n1) or Z(n2) or ...
 ```
+
+where `W` is the hazard warning the rover reads and `A` is the radiation alert.
 
 as CNF clauses, together with the unit clauses for what the sensors actually
 said. To ask whether a square is safe the prover negates the query, adds it, and
@@ -108,12 +108,12 @@ budget. Running out of budget is reported as "not proved", never as "proved
 false", so a timeout can only ever make the rover more careful.
 
 **Weighted model counting** (`model_count` in `rover/logic.py`) does two jobs.
-It pins the radiation source down, since there is only one of it and enumerating
+It pins the radiation zone down, since there is only one of it and enumerating
 its possible squares is cheap. And when nothing is provable it enumerates the
-frontier crevasse variables, weights each assignment by the generation
-probability, and reports how likely each square is to hold a crevasse. A flat
-count would answer the wrong question here: with one tremor and three unknown
-neighbours it calls each of them 57% likely, because it treats three crevasses
+frontier hazard variables, weights each assignment by the generation
+probability, and reports how likely each square is to hold a hazard. A flat
+count would answer the wrong question here: with one warning and three unknown
+neighbours it calls each of them 57% likely, because it treats three hazards
 as being as plausible as one. Weighting by the prior gives the numbers you would
 expect.
 
@@ -122,11 +122,11 @@ conclusions so resolution is only spent on the hard ones. The terrain rules are
 written once, with variables, and a small unifier grounds them against the grid:
 
 ```
-Visited(c)                                   => NoCrevasse(c)
-Visited(c) and NoTremor(c) and Adjacent(c,n) => NoCrevasse(n)
-Visited(c) and NoGeiger(c) and Adjacent(c,n) => NoSource(n)
-NoCrevasse(c) and NoSource(c)                => Safe(c)
-SourceSealed and Cell(c)                     => NoSource(c)
+Visited(c)                                    => NoHazard(c)
+Visited(c) and NoWarning(c) and Adjacent(c,n) => NoHazard(n)
+Visited(c) and NoAlert(c) and Adjacent(c,n)   => NoRadiation(n)
+NoHazard(c) and NoRadiation(c)                => Safe(c)
+RadiationSealed and Cell(c)                   => NoRadiation(c)
 ```
 
 Every derived fact stores the rule and the bindings that produced it, which is
@@ -140,7 +140,7 @@ overestimates on a 4-connected unit-cost grid, so A* returns an optimal path.
 
 The part worth pointing at is the passable set. A* is only allowed through
 squares the knowledge base has proved safe, plus squares already driven on,
-minus squares proved to hold a crevasse. That set is small at the start and
+minus squares proved to hold a hazard. That set is small at the start and
 grows as the rover explores, so the same search over the same grid returns
 different answers on consecutive turns.
 
@@ -151,7 +151,7 @@ line to the next candidate.
 
 ## Measured results
 
-400 randomly generated 6x6 maps, crevasse probability 0.16, seeds 0 to 399:
+400 randomly generated 6x6 maps, hazard probability 0.16, seeds 0 to 399:
 
 ```
 sample recovered      64.5%
@@ -206,7 +206,7 @@ python -m unittest discover -s tests -t .
 Covers the prover on cases where entailment holds and cases where it does not,
 unification, the effect of the prior on the posterior, A* optimality and
 optimality under obstacles, and the environment guarantees (the lander and its
-neighbours are never crevasses, the sample is always reachable, a seed always
+neighbours are never hazards, the sample is always reachable, a seed always
 rebuilds the same map).
 
 ## Group 6

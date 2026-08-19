@@ -91,8 +91,9 @@ def peas():
         [
             p("Environment", cellb),
             p(
-                "6x6 survey grid. Each square outside the lander and its neighbours holds a crevasse "
-                "with probability 0.16, plus one radiation source and one sample cache. Generation "
+                "6x6 survey grid of safe terrain, unknown hazards and one radiation zone. Each square "
+                "outside the lander and its neighbours holds a hazard with probability 0.16, plus one "
+                "radiation zone and one sample cache. Generation "
                 "retries until the sample is reachable without crossing a hazard. Partially observable "
                 "(readings are local only), deterministic, sequential, static, discrete, single agent.",
             ),
@@ -101,16 +102,16 @@ def peas():
             p("Actuators", cellb),
             p(
                 "Drive to an orthogonally adjacent square (north, south, east, west), Collect the "
-                "sample, Seal the radiation source along a bearing with the single containment "
+                "sample, Neutralise the radiation zone along a bearing with the single containment "
                 "charge, Dock at the lander.",
             ),
         ],
         [
             p("Sensors", cellb),
             p(
-                "Seismic tremor (a crevasse is adjacent), Geiger reading (the radiation source is "
-                "adjacent), sample beacon (the cache is on this square), telemetry spike (the charge "
-                "sealed the source), bump (drove into the edge). Nothing else is visible: the rover "
+                "Hazard warning (an unknown hazard is adjacent), radiation alert (the radiation zone "
+                "is adjacent), sample beacon (the cache is on this square), neutralise confirmation, "
+                "bump (drove into the edge). Nothing else is visible: the rover "
                 "never sees a square it has not parked on.",
             ),
         ],
@@ -125,7 +126,7 @@ def formulation():
             p(
                 "Rover state is (position, knowledge base, has_sample, has_charge, source_active). The "
                 "planner searches a smaller graph: vertices are the squares currently proved safe or "
-                "already driven on, minus squares proved to hold a crevasse; edges join orthogonal "
+                "already driven on, minus squares proved to hold a hazard; edges join orthogonal "
                 "neighbours. That vertex set changes after every reading, which is what forces the replan.",
             ),
         ],
@@ -133,8 +134,8 @@ def formulation():
             p("Initial state", cellb),
             p(
                 "Rover at the lander (0,0) facing east, charge unused, no sample. KB holds only "
-                "Visited(0,0) plus the adjacency facts for the grid. Nothing about crevasses, the "
-                "radiation source or the sample cache is given.",
+                "Visited(0,0) plus the adjacency facts for the grid. Nothing about the hazards, the "
+                "radiation zone or the sample cache is given.",
             ),
         ],
         [
@@ -164,11 +165,11 @@ def formulation():
         [
             p("First-order rules", cellb),
             p(
-                "Visited(c) =&gt; NoCrevasse(c) &nbsp;&middot;&nbsp; Visited(c) =&gt; NoSource(c)<br/>"
-                "Visited(c) and NoTremor(c) and Adjacent(c,n) =&gt; NoCrevasse(n)<br/>"
-                "Visited(c) and NoGeiger(c) and Adjacent(c,n) =&gt; NoSource(n)<br/>"
-                "NoCrevasse(c) and NoSource(c) =&gt; Safe(c) &nbsp;&middot;&nbsp; "
-                "SourceSealed and Cell(c) =&gt; NoSource(c)<br/>"
+                "Visited(c) =&gt; NoHazard(c) &nbsp;&middot;&nbsp; Visited(c) =&gt; NoRadiation(c)<br/>"
+                "Visited(c) and NoWarning(c) and Adjacent(c,n) =&gt; NoHazard(n)<br/>"
+                "Visited(c) and NoAlert(c) and Adjacent(c,n) =&gt; NoRadiation(n)<br/>"
+                "NoHazard(c) and NoRadiation(c) =&gt; Safe(c) &nbsp;&middot;&nbsp; "
+                "RadiationSealed and Cell(c) =&gt; NoRadiation(c)<br/>"
                 "Applied by forward chaining to a fixpoint, with unification against the ground "
                 "adjacency facts.",
             ),
@@ -176,12 +177,12 @@ def formulation():
         [
             p("Propositional axioms", cellb),
             p(
-                "T<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of C<sub>n</sub> &nbsp;&nbsp;and"
-                "&nbsp;&nbsp; G<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of R<sub>n</sub> , where T is a "
-                "seismic tremor, G a Geiger reading, C a crevasse and R the radiation source. Added in "
-                "CNF the first time a square is seen, together with the unit clauses not C<sub>c</sub>, "
-                "not R<sub>c</sub> for every square driven on and the observed T<sub>c</sub> or not "
-                "T<sub>c</sub>.",
+                "W<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of H<sub>n</sub> &nbsp;&nbsp;and"
+                "&nbsp;&nbsp; A<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of Z<sub>n</sub> , where W is the "
+                "hazard warning, A the radiation alert, H an unknown hazard and Z the radiation zone. "
+                "Added in CNF the first time a square is seen, together with the unit clauses not "
+                "H<sub>c</sub>, not Z<sub>c</sub> for every square driven on and the observed "
+                "W<sub>c</sub> or not W<sub>c</sub>.",
             ),
         ],
         [
@@ -197,9 +198,9 @@ def formulation():
         [
             p("Risk when no proof exists", cellb),
             p(
-                "P(C<sub>c</sub> | evidence) = [ sum of w(m) over the models that satisfy the "
-                "evidence and set C<sub>c</sub> true ] / [ sum of w(m) over every model that "
-                "satisfies the evidence ], where w(m) is the product of p over the true crevasse "
+                "P(H<sub>c</sub> | evidence) = [ sum of w(m) over the models that satisfy the "
+                "evidence and set H<sub>c</sub> true ] / [ sum of w(m) over every model that "
+                "satisfies the evidence ], where w(m) is the product of p over the true hazard "
                 "variables and (1-p) over the false ones, p = 0.16. Enumerated over the unproved "
                 "frontier variables only. The rover drives onto the minimum if it is at or below "
                 "0.25, otherwise it returns to the lander and docks.",
@@ -288,7 +289,8 @@ def build(path):
         p(
             "Measurements reproduce with <font face=\"Courier\">python run.py --benchmark 400 "
             "--seed 0</font> on Python 3.11. The recorded demo run is "
-            "<font face=\"Courier\">python run.py --seed 114 --delay 1800</font>: resolution proves a crevasse at (2,0), model checking pins the radiation source at "
+            "<font face=\"Courier\">python run.py --seed 114 --delay 2400</font>: resolution proves a "
+            "hazard at (2,0), model checking pins the radiation zone at "
             "(1,1), 19 turns, 16 moves, 47 nodes expanded, 34 resolution queries with 2 proofs, "
             "final score 971.",
             body,

@@ -4,12 +4,12 @@ Only what the survey needs: definite clauses, constants and variables, no
 functions. Terms are plain strings; a string starting with "?" is a
 variable. A literal is a tuple (predicate, term, term, ...).
 
-    Visited(?c) and NoTremor(?c) and Adjacent(?c, ?n)  =>  NoCrevasse(?n)
+    Visited(?c) and NoWarning(?c) and Adjacent(?c, ?n)  =>  NoHazard(?n)
 
 is written as
 
-    Rule([("Visited", "?c"), ("NoTremor", "?c"), ("Adjacent", "?c", "?n")],
-         ("NoCrevasse", "?n"))
+    Rule([("Visited", "?c"), ("NoWarning", "?c"), ("Adjacent", "?c", "?n")],
+         ("NoHazard", "?n"))
 
 Forward chaining runs to a fixpoint. Every derived fact keeps the rule
 name and the bindings that produced it, so the agent can print the
@@ -124,26 +124,26 @@ class FolKB:
 
 # The knowledge engineering part: the terrain rules written once, in FOL.
 TERRAIN_RULES = [
-    Rule([("Visited", "?c")], ("NoCrevasse", "?c"), "R1 a square already driven holds no crevasse"),
-    Rule([("Visited", "?c")], ("NoSource", "?c"), "R2 a square already driven holds no radiation"),
+    Rule([("Visited", "?c")], ("NoHazard", "?c"), "R1 a square already driven holds no hazard"),
+    Rule([("Visited", "?c")], ("NoRadiation", "?c"), "R2 a square already driven holds no radiation"),
     Rule(
-        [("Visited", "?c"), ("NoTremor", "?c"), ("Adjacent", "?c", "?n")],
-        ("NoCrevasse", "?n"),
-        "R3 no tremor means no crevasse next door",
+        [("Visited", "?c"), ("NoWarning", "?c"), ("Adjacent", "?c", "?n")],
+        ("NoHazard", "?n"),
+        "R3 no warning means no hazard next door",
     ),
     Rule(
-        [("Visited", "?c"), ("NoGeiger", "?c"), ("Adjacent", "?c", "?n")],
-        ("NoSource", "?n"),
-        "R4 a clean Geiger reading clears the neighbours",
+        [("Visited", "?c"), ("NoAlert", "?c"), ("Adjacent", "?c", "?n")],
+        ("NoRadiation", "?n"),
+        "R4 no alert means no radiation next door",
     ),
     Rule(
-        [("NoCrevasse", "?c"), ("NoSource", "?c")],
+        [("NoHazard", "?c"), ("NoRadiation", "?c")],
         ("Safe", "?c"),
         "R5 a square with neither hazard is safe",
     ),
     Rule(
-        [("SourceSealed", "yes"), ("Cell", "?c")],
-        ("NoSource", "?c"),
-        "R6 a sealed source emits nothing anywhere",
+        [("RadiationSealed", "yes"), ("Cell", "?c")],
+        ("NoRadiation", "?c"),
+        "R6 a neutralised zone emits nothing anywhere",
     ),
 ]

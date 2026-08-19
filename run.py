@@ -17,11 +17,11 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description="Mars rover: a propositional logic agent with A* replanning")
     p.add_argument("--size", type=int, default=6, help="grid is size x size, default 6")
     p.add_argument(
-        "--hazard-prob", type=float, default=0.16, help="chance of a crevasse per square"
+        "--hazard-prob", type=float, default=0.16, help="chance of a hazard per square"
     )
     p.add_argument("--seed", type=int, default=None, help="fix the map layout")
     p.add_argument("--delay", type=int, default=650, help="milliseconds between turns")
-    p.add_argument("--risk", type=float, default=0.25, help="highest crevasse estimate worth driving onto")
+    p.add_argument("--risk", type=float, default=0.25, help="highest hazard estimate worth driving onto")
     p.add_argument("--max-steps", type=int, default=250, help="give up after this many turns")
     p.add_argument("--ascii", action="store_true", help="render in the terminal instead")
     p.add_argument("--headless", action="store_true", help="log only, no map")
@@ -59,7 +59,7 @@ def benchmark(args):
         return statistics.mean(r[key] for r in rows)
 
     print(
-        "%d maps, %dx%d, crevasse probability %.2f"
+        "%d maps, %dx%d, hazard probability %.2f"
         % (args.benchmark, args.size, args.size, args.hazard_prob)
     )
     print("sample recovered %.1f%%" % (100 * sum(r["won"] for r in rows) / len(rows)))
@@ -84,7 +84,7 @@ def main(argv=None):
 
     session = build(args, args.seed)
     print(
-        "survey grid %dx%d, crevasse probability %.2f, seed %s"
+        "survey grid %dx%d, hazard probability %.2f, seed %s"
         % (args.size, args.size, args.hazard_prob, args.seed)
     )
     print("rover starts at the lander (0, 0) knowing only that the landing square is safe")

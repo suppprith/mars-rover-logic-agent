@@ -49,12 +49,12 @@ class Search(unittest.TestCase):
 
 
 class Environment(unittest.TestCase):
-    def test_the_lander_and_its_neighbours_hold_no_crevasses(self):
+    def test_the_lander_and_its_neighbours_hold_no_hazards(self):
         for seed in range(40):
             terrain = Terrain(size=6, hazard_prob=0.3, seed=seed)
-            self.assertNotIn((0, 0), terrain.crevasses)
+            self.assertNotIn((0, 0), terrain.hazards)
             for cell in neighbours((0, 0), 6):
-                self.assertNotIn(cell, terrain.crevasses)
+                self.assertNotIn(cell, terrain.hazards)
 
     def test_the_sample_is_always_reachable(self):
         for seed in range(40):
@@ -64,24 +64,24 @@ class Environment(unittest.TestCase):
     def test_the_same_seed_builds_the_same_map(self):
         a = Terrain(size=6, seed=99)
         b = Terrain(size=6, seed=99)
-        self.assertEqual(a.crevasses, b.crevasses)
-        self.assertEqual((a.source, a.sample), (b.source, b.sample))
+        self.assertEqual(a.hazards, b.hazards)
+        self.assertEqual((a.radiation, a.sample), (b.radiation, b.sample))
 
-    def test_driving_into_a_crevasse_ends_the_run(self):
+    def test_driving_into_a_hazard_ends_the_run(self):
         terrain = Terrain(size=4, hazard_prob=0.0, seed=1)
-        terrain.crevasses = {(1, 0)}
+        terrain.hazards = {(1, 0)}
         terrain.act("move", (1, 0))
         self.assertFalse(terrain.operational)
         self.assertLess(terrain.score, -1000 + 1)
 
     def test_the_charge_only_travels_in_a_straight_line(self):
         terrain = Terrain(size=4, hazard_prob=0.0, seed=2)
-        terrain.source = (0, 3)
+        terrain.radiation = (0, 3)
         terrain.act("seal", "east")
-        self.assertTrue(terrain.source_active)
+        self.assertTrue(terrain.radiation_active)
         terrain.has_charge = True
         terrain.act("seal", "north")
-        self.assertFalse(terrain.source_active)
+        self.assertFalse(terrain.radiation_active)
 
 
 if __name__ == "__main__":

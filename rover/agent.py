@@ -80,7 +80,7 @@ class Agent:
 
     def _passable(self):
         """Cells A* is allowed to route through."""
-        return (self.kb.safe_cells() | self.kb.visited) - self.kb.known_crevasses()
+        return (self.kb.safe_cells() | self.kb.visited) - self.kb.known_hazards()
 
     def _pick_target(self):
         candidates = [c for c in self.kb.unexplored_safe() if c != self.position]
@@ -105,9 +105,9 @@ class Agent:
         return Decision("move", self.plan[0], full, result.path)
 
     def _consider_sealing(self):
-        if not self.has_charge or self.kb.source_sealed:
+        if not self.has_charge or self.kb.radiation_sealed:
             return None
-        spot = self.kb.source_location()
+        spot = self.kb.radiation_location()
         if spot is None:
             return None
         direction = self._line_of_sight(spot)
@@ -118,7 +118,7 @@ class Agent:
         return Decision(
             "seal",
             direction,
-            "the radiation source is proved to sit at %s, straight %s of here" % (spot, direction),
+            "the radiation zone is proved to sit at %s, straight %s of here" % (spot, direction),
             [self.position, spot],
         )
 
@@ -132,10 +132,10 @@ class Agent:
         return None
 
     def _consider_risk(self):
-        risk = self.kb.crevasse_risk()
+        risk = self.kb.hazard_risk()
         reachable = {}
         for cell, score in risk.items():
-            if self.kb.fol.holds(("Source", self.kb._name(cell))) and not self.kb.source_sealed:
+            if self.kb.fol.holds(("Radiation", self.kb._name(cell))) and not self.kb.radiation_sealed:
                 continue
             if any(n in self.kb.visited for n in neighbours(cell, self.size)):
                 reachable[cell] = score
@@ -153,7 +153,7 @@ class Agent:
 
         self.goal = cell
         self.plan = result.path[1:]
-        reason = "nothing proved safe, %s carries the lowest crevasse estimate at %.0f%%" % (
+        reason = "nothing proved safe, %s carries the lowest hazard estimate at %.0f%%" % (
             cell,
             score * 100,
         )
