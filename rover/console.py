@@ -13,8 +13,8 @@ GLYPH = {
     "unknown": "??",
     "safe": "ok",
     "seen": "..",
-    "pit": "PP",
-    "wumpus": "WW",
+    "crevasse": "XX",
+    "source": "RR",
 }
 
 
@@ -24,19 +24,19 @@ def clear():
 
 
 def board(session, reveal=False):
-    cave = session.cave
+    terrain = session.terrain
     rows = []
     for y in range(session.size - 1, -1, -1):
         cells = []
         for x in range(session.size):
             cell = (x, y)
-            if cell == cave.agent:
+            if cell == terrain.rover:
                 token = "@@"
-            elif reveal and cell in cave.pits:
-                token = "PIT"[:2]
-            elif reveal and cell == cave.gold and not cave.has_gold:
+            elif reveal and cell in terrain.crevasses:
+                token = "XX"
+            elif reveal and cell == terrain.sample and not terrain.has_sample:
                 token = "$$"
-            elif reveal and cell == cave.wumpus and cave.wumpus_alive:
+            elif reveal and cell == terrain.source and terrain.source_active:
                 token = "WW"
             else:
                 token = GLYPH[session.belief(cell)]
@@ -48,7 +48,10 @@ def board(session, reveal=False):
 
 
 def legend():
-    return "@@ agent   ok proved safe   .. visited   ?? frontier   PP pit   WW wumpus"
+    return (
+        "@@ rover   ok proved safe   .. surveyed   ?? frontier   "
+        "XX crevasse   RR radiation   $$ sample"
+    )
 
 
 def play(session, delay=0.6, reveal=False, redraw=True):

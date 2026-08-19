@@ -5,7 +5,7 @@ are complements. A clause is a frozenset of literals, read as a
 disjunction. A knowledge base is a list of clauses, read as a
 conjunction.
 
-Proving that the cave is safe at some cell means proving KB entails
+Proving that the terrain is safe at some cell means proving KB entails
 ~P(cell). Resolution does that by refutation: assume the opposite, add
 it to the KB, and try to derive the empty clause.
 """
@@ -45,8 +45,8 @@ def resolve(a, b):
 def biconditional_clauses(head, body):
     """Clauses for `head <=> body1 or body2 or ...`.
 
-    Used for the sensor axioms: a cell is breezy exactly when at least
-    one neighbour holds a pit.
+    Used for the sensor axioms: a square reads a tremor exactly when at
+    least one neighbour holds a crevasse.
     """
     out = [frozenset([neg(head)] + list(body))]
     for lit in body:
@@ -59,7 +59,7 @@ class Prover:
 
     The set of support starts as the negated query and every resolution
     step must involve a clause derived from it. The background KB is
-    satisfiable by construction (it describes a real cave), so this
+    satisfiable by construction (it describes a real terrain), so this
     restriction keeps refutation completeness while cutting out the huge
     number of useless KB-against-KB resolutions.
 
@@ -135,11 +135,11 @@ def model_count(symbols, constraints, prior=0.5, limit=1 << 16):
     assignments that satisfy every constraint are summed. What comes back
     is P(symbol is true | constraints) for each symbol.
 
-    Uniform counting would answer a different question. With one breeze
-    and three unknown neighbours it says every one of them is 57% likely
-    to be a pit, because it treats "all three are pits" as being just as
-    plausible as "exactly one is". Weighting by the generation
-    probability fixes that and gives the textbook numbers.
+    Uniform counting would answer a different question. With one tremor
+    and three unknown neighbours it calls every one of them 57% likely,
+    because it treats "all three are crevasses" as being just as plausible
+    as "exactly one is". Weighting by the generation probability fixes
+    that and gives the textbook numbers.
     """
     symbols = list(symbols)
     if not symbols or 2 ** len(symbols) > limit:

@@ -1,4 +1,4 @@
-"""Ties the cave and the agent together and keeps the running log.
+"""Ties the terrain and the rover together and keeps the running log.
 
 Both front ends drive the same Session, so the Tkinter window and the
 terminal log always show the same run.
@@ -7,13 +7,20 @@ terminal log always show the same run.
 import time
 
 from .agent import Agent
-from .world import Cave
+from .world import Terrain
+
+READOUT = {
+    "tremor": "seismic tremor",
+    "geiger": "radiation",
+    "signal": "sample beacon",
+    "spike": "telemetry spike",
+}
 
 
 class Session:
-    def __init__(self, size=6, pit_prob=0.16, seed=None, risk_limit=0.25, max_steps=250):
-        self.cave = Cave(size=size, pit_prob=pit_prob, seed=seed)
-        self.agent = Agent(size=size, risk_limit=risk_limit, pit_prior=pit_prob)
+    def __init__(self, size=6, hazard_prob=0.16, seed=None, risk_limit=0.25, max_steps=250):
+        self.terrain = Terrain(size=size, hazard_prob=hazard_prob, seed=seed)
+        self.agent = Agent(size=size, risk_limit=risk_limit, hazard_prior=hazard_prob)
         self.max_steps = max_steps
         self.size = size
 
@@ -26,7 +33,7 @@ class Session:
 
     @property
     def done(self):
-        return self.cave.finished or self.tick >= self.max_steps
+        return self.terrain.finished or self.tick >= self.max_steps
 
     def emit(self, text):
         line = "[%03d] %s" % (self.tick, text)
@@ -40,11 +47,13 @@ class Session:
 
         self.tick += 1
         fresh = []
-        cell = self.cave.agent
-        percepts = self.cave.percepts()
+        cell = self.terrain.rover
+        percepts = self.terrain.percepts()
 
-        active = [k for k in ("breeze", "stench", "glitter", "scream") if percepts[k]]
-        fresh.append(self.emit("at %s, senses: %s" % (cell, ", ".join(active) or "nothing")))
+        active = [READOUT[k] for k in READOUT if percepts[k]]
+        fresh.append(
+            self.emit("at %s, sensors: %s" % (cell, ", ".join(active) or "all clear"))
+        )
 
         decision = self.agent.step(cell, percepts)
         for note in self.agent.notes:
@@ -55,13 +64,13 @@ class Session:
             label = "%s %s" % (decision.action, decision.argument)
         fresh.append(self.emit("  act | %s because %s" % (label, decision.reason)))
 
-        outcome = self.cave.act(decision.action, decision.argument)
+        outcome = self.terrain.act(decision.action, decision.argument)
         fresh.append(self.emit("  env | %s" % outcome))
 
         self.last = decision
         self.elapsed = time.perf_counter() - self.started
 
-        if self.cave.finished:
+        if self.terrain.finished:
             fresh.extend(self.emit(line) for line in self.summary_lines())
         elif self.tick >= self.max_steps:
             self.outcome = "step limit reached"
@@ -75,19 +84,19 @@ class Session:
         return self.outcome
 
     def summary_lines(self):
-        cave = self.cave
-        if cave.escaped and cave.has_gold:
-            self.outcome = "escaped with the gold"
-        elif cave.escaped:
-            self.outcome = "escaped empty handed"
-        elif not cave.alive:
-            self.outcome = "died in the cave"
+        terrain = self.terrain
+        if terrain.docked and terrain.has_sample:
+            self.outcome = "docked with the sample"
+        elif terrain.docked:
+            self.outcome = "docked empty handed"
+        elif not terrain.operational:
+            self.outcome = "rover lost in the field"
         else:
             self.outcome = "still going"
 
         m = self.agent.metrics()
         return [
-            "result: %s, score %d" % (self.outcome, cave.score),
+            "result: %s, score %d" % (self.outcome, terrain.score),
             "path cost %d moves, %d turns total, %d replans"
             % (m["moves"], m["steps"], m["replans"]),
             "A* expanded %d nodes and generated %d"
@@ -100,14 +109,14 @@ class Session:
         ]
 
     def belief(self, cell):
-        """One short tag per cell for the map overlay."""
+        """One short tag per square for the map overlay."""
         kb = self.agent.kb
         if cell in kb.visited:
             return "seen"
-        if cell in kb.known_pits():
-            return "pit"
-        if kb.wumpus_location() == cell:
-            return "wumpus"
+        if cell in kb.known_crevasses():
+            return "crevasse"
+        if kb.source_location() == cell:
+            return "source"
         if kb.safe(cell):
             return "safe"
         if cell in kb.frontier():

@@ -5,59 +5,59 @@ Run with:  python -m unittest discover tests
 
 import unittest
 
-from wumpus import fol, logic
-from wumpus.knowledge import KnowledgeBase
-from wumpus.logic import biconditional_clauses as bic
-from wumpus.logic import clause, neg
+from rover import fol, logic
+from rover.knowledge import KnowledgeBase
+from rover.logic import biconditional_clauses as bic
+from rover.logic import clause, neg
 
 
 class Resolution(unittest.TestCase):
-    def test_no_breeze_clears_the_neighbours(self):
-        kb = bic("B0,0", ["P1,0", "P0,1"]) + [clause(neg("B0,0"))]
+    def test_no_tremor_clears_the_neighbours(self):
+        kb = bic("T0,0", ["C1,0", "C0,1"]) + [clause(neg("T0,0"))]
         prover = logic.Prover()
-        self.assertTrue(prover.entails(kb, neg("P1,0")))
-        self.assertTrue(prover.entails(kb, neg("P0,1")))
+        self.assertTrue(prover.entails(kb, neg("C1,0")))
+        self.assertTrue(prover.entails(kb, neg("C0,1")))
 
-    def test_a_breeze_alone_proves_nothing_about_one_cell(self):
-        kb = bic("B0,0", ["P1,0", "P0,1"]) + [clause("B0,0")]
+    def test_a_tremor_alone_proves_nothing_about_one_square(self):
+        kb = bic("T0,0", ["C1,0", "C0,1"]) + [clause("T0,0")]
         prover = logic.Prover()
-        self.assertFalse(prover.entails(kb, "P1,0"))
-        self.assertFalse(prover.entails(kb, neg("P1,0")))
+        self.assertFalse(prover.entails(kb, "C1,0"))
+        self.assertFalse(prover.entails(kb, neg("C1,0")))
 
     def test_ruling_out_the_alternatives_locates_the_pit(self):
-        kb = bic("B0,0", ["P1,0", "P0,1"])
-        kb += [clause("B0,0"), clause(neg("P0,1"))]
+        kb = bic("T0,0", ["C1,0", "C0,1"])
+        kb += [clause("T0,0"), clause(neg("C0,1"))]
         prover = logic.Prover()
-        self.assertTrue(prover.entails(kb, "P1,0"))
+        self.assertTrue(prover.entails(kb, "C1,0"))
 
     def test_contradiction_is_never_reported_as_a_proof_of_both(self):
-        kb = bic("B1,1", ["P1,0", "P0,1", "P2,1", "P1,2"])
-        kb += [clause("B1,1"), clause(neg("P1,0")), clause(neg("P0,1"))]
+        kb = bic("T1,1", ["C1,0", "C0,1", "C2,1", "C1,2"])
+        kb += [clause("T1,1"), clause(neg("C1,0")), clause(neg("C0,1"))]
         prover = logic.Prover()
-        self.assertFalse(prover.entails(kb, "P2,1"))
-        self.assertFalse(prover.entails(kb, neg("P2,1")))
+        self.assertFalse(prover.entails(kb, "C2,1"))
+        self.assertFalse(prover.entails(kb, neg("C2,1")))
 
 
 class ForwardChaining(unittest.TestCase):
     def test_a_rule_fires_once_its_premises_are_present(self):
-        kb = fol.FolKB(fol.CAVE_RULES)
+        kb = fol.FolKB(fol.TERRAIN_RULES)
         kb.tell(("Cell", "0,0"))
         kb.tell(("Adjacent", "0,0", "1,0"))
         kb.tell(("Visited", "0,0"))
-        kb.tell(("NoBreeze", "0,0"))
-        kb.tell(("NoStench", "0,0"))
+        kb.tell(("NoTremor", "0,0"))
+        kb.tell(("NoGeiger", "0,0"))
         kb.forward_chain()
         self.assertTrue(kb.holds(("Safe", "1,0")))
 
-    def test_a_stench_blocks_the_safety_conclusion(self):
-        kb = fol.FolKB(fol.CAVE_RULES)
+    def test_a_geiger_reading_blocks_the_safety_conclusion(self):
+        kb = fol.FolKB(fol.TERRAIN_RULES)
         kb.tell(("Cell", "0,0"))
         kb.tell(("Adjacent", "0,0", "1,0"))
         kb.tell(("Visited", "0,0"))
-        kb.tell(("NoBreeze", "0,0"))
-        kb.tell(("Stench", "0,0"))
+        kb.tell(("NoTremor", "0,0"))
+        kb.tell(("Geiger", "0,0"))
         kb.forward_chain()
-        self.assertTrue(kb.holds(("NoPit", "1,0")))
+        self.assertTrue(kb.holds(("NoCrevasse", "1,0")))
         self.assertFalse(kb.holds(("Safe", "1,0")))
 
     def test_unify_refuses_to_bind_one_variable_two_ways(self):
@@ -76,13 +76,13 @@ class ModelCounting(unittest.TestCase):
         self.assertAlmostEqual(flat["x"], 2 / 3)
         self.assertLess(rare["x"], flat["x"])
 
-    def test_pinning_the_wumpus_needs_a_single_survivor(self):
+    def test_pinning_the_source_needs_a_single_survivor(self):
         kb = KnowledgeBase(4)
         kb.perceive((0, 0), _percepts())
-        self.assertIsNone(kb.wumpus_location())
-        kb.perceive((1, 0), _percepts(stench=True))
-        kb.perceive((0, 1), _percepts(stench=True))
-        self.assertEqual(kb.wumpus_location(), (1, 1))
+        self.assertIsNone(kb.source_location())
+        kb.perceive((1, 0), _percepts(geiger=True))
+        kb.perceive((0, 1), _percepts(geiger=True))
+        self.assertEqual(kb.source_location(), (1, 1))
 
 
 class Safety(unittest.TestCase):
@@ -91,19 +91,19 @@ class Safety(unittest.TestCase):
         kb.perceive((0, 0), _percepts())
         self.assertEqual(kb.safe_cells(), {(0, 0), (1, 0), (0, 1)})
 
-    def test_a_breeze_stops_the_agent_calling_a_cell_safe(self):
+    def test_a_tremor_stops_the_rover_calling_a_square_safe(self):
         kb = KnowledgeBase(4)
-        kb.perceive((0, 0), _percepts(breeze=True))
+        kb.perceive((0, 0), _percepts(tremor=True))
         self.assertEqual(kb.safe_cells(), {(0, 0)})
-        self.assertGreater(max(kb.pit_risk().values()), 0.16)
+        self.assertGreater(max(kb.crevasse_risk().values()), 0.16)
 
 
-def _percepts(breeze=False, stench=False, glitter=False, scream=False):
+def _percepts(tremor=False, geiger=False, signal=False, spike=False):
     return {
-        "breeze": breeze,
-        "stench": stench,
-        "glitter": glitter,
-        "scream": scream,
+        "tremor": tremor,
+        "geiger": geiger,
+        "signal": signal,
+        "spike": spike,
         "bump": False,
     }
 

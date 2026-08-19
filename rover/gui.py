@@ -1,11 +1,11 @@
-"""Tkinter view of the cave.
+"""Tkinter view of the survey grid.
 
-Left half is the grid the agent walks. Right half is the live read-out of
-its state and the counters. Every line the window draws also goes to
+Left half is the grid the rover drives. Right half is the live read-out
+of its state and the counters. Every line the window draws also goes to
 stdout, so putting the terminal next to the window gives you the map and
 the reasoning trace side by side.
 
-Keys: space pauses and resumes, right arrow steps once while paused,
+Keys: space pauses and resumes, right arrow key steps once while paused,
 r reveals the hazards, q quits.
 """
 
@@ -22,8 +22,8 @@ FILL = {
     "unknown": "#3a2f1e",
     "safe": "#1d3a2c",
     "seen": "#24303f",
-    "pit": "#4a1f24",
-    "wumpus": "#43244a",
+    "crevasse": "#4a1f24",
+    "source": "#43244a",
 }
 
 ACCENT = "#e2b33c"
@@ -45,7 +45,7 @@ class Window:
         board = self.cell * size
 
         self.root = tk.Tk()
-        self.root.title("Wumpus World: logical agent with A* replanning")
+        self.root.title("Mars rover: propositional logic agent with A* replanning")
         self.root.configure(bg=BG)
 
         self.canvas = tk.Canvas(
@@ -127,7 +127,7 @@ class Window:
     def draw(self):
         self.canvas.delete("all")
         session = self.session
-        risk = session.agent.kb.pit_risk()
+        risk = session.agent.kb.crevasse_risk()
 
         for x in range(session.size):
             for y in range(session.size):
@@ -140,7 +140,7 @@ class Window:
 
     def _draw_cell(self, cell, risk):
         session = self.session
-        cave = session.cave
+        terrain = session.terrain
         kb = session.agent.kb
         l, t, r, b = self._box(cell)
         state = session.belief(cell)
@@ -148,10 +148,10 @@ class Window:
         self.canvas.create_rectangle(l, t, r, b, fill=FILL[state], outline=GRID_LINE, width=1)
 
         marks = []
-        if cell in kb.breezy:
-            marks.append("breeze")
-        if cell in kb.smelly:
-            marks.append("stench")
+        if cell in kb.trembling:
+            marks.append("tremor")
+        if cell in kb.irradiated:
+            marks.append("geiger")
         if marks:
             self.canvas.create_text(
                 (l + r) / 2,
@@ -165,7 +165,7 @@ class Window:
             self.canvas.create_text(
                 (l + r) / 2,
                 b - 14,
-                text="pit %.0f%%" % (risk[cell] * 100),
+                text="crevasse %.0f%%" % (risk[cell] * 100),
                 fill=ACCENT,
                 font=("Consolas", 8),
             )
@@ -173,25 +173,25 @@ class Window:
             self.canvas.create_text(
                 (l + r) / 2, b - 14, text="proved safe", fill="#63c08a", font=("Consolas", 8)
             )
-        elif state == "pit":
+        elif state == "crevasse":
             self.canvas.create_text(
-                (l + r) / 2, b - 14, text="pit proved", fill=DANGER, font=("Consolas", 8)
+                (l + r) / 2, b - 14, text="crevasse proved", fill=DANGER, font=("Consolas", 8)
             )
 
         if self.reveal:
             hidden = []
-            if cell in cave.pits:
-                hidden.append("PIT")
-            if cell == cave.wumpus:
-                hidden.append("WUMPUS" if cave.wumpus_alive else "dead wumpus")
-            if cell == cave.gold and not cave.has_gold:
-                hidden.append("GOLD")
+            if cell in terrain.crevasses:
+                hidden.append("CREVASSE")
+            if cell == terrain.source:
+                hidden.append("RADIATION" if terrain.source_active else "sealed source")
+            if cell == terrain.sample and not terrain.has_sample:
+                hidden.append("SAMPLE")
             if hidden:
                 self.canvas.create_text(
                     (l + r) / 2,
                     (t + b) / 2 + 2,
                     text="\n".join(hidden),
-                    fill=DANGER if "PIT" in hidden or "WUMPUS" in hidden else ACCENT,
+                    fill=DANGER if "CREVASSE" in hidden or "RADIATION" in hidden else ACCENT,
                     font=("Consolas", 9, "bold"),
                 )
 
@@ -202,10 +202,10 @@ class Window:
         points = []
         for cell in decision.path:
             points.extend(self._centre(cell))
-        style = () if decision.action != "shoot" else (6, 4)
+        style = () if decision.action != "seal" else (6, 4)
         self.canvas.create_line(
             *points,
-            fill=DANGER if decision.action == "shoot" else PATH,
+            fill=DANGER if decision.action == "seal" else PATH,
             width=3,
             dash=style,
             arrow="last",
@@ -213,13 +213,13 @@ class Window:
         )
 
     def _draw_agent(self):
-        cx, cy = self._centre(self.session.cave.agent)
+        cx, cy = self._centre(self.session.terrain.rover)
         radius = self.cell * 0.22
-        colour = ACCENT if self.session.cave.alive else DANGER
+        colour = ACCENT if self.session.terrain.operational else DANGER
         self.canvas.create_oval(
             cx - radius, cy - radius, cx + radius, cy + radius, fill=colour, outline=""
         )
-        if self.session.cave.has_gold:
+        if self.session.terrain.has_sample:
             self.canvas.create_text(cx, cy, text="G", fill="#11151c", font=("Consolas", 11, "bold"))
 
     def _draw_labels(self):
@@ -235,7 +235,7 @@ class Window:
 
     def _write_status(self):
         session = self.session
-        cave = session.cave
+        terrain = session.terrain
         m = session.agent.metrics()
         decision = session.last
 
@@ -245,11 +245,11 @@ class Window:
         lines = [
             "turn %d%s" % (session.tick, "   [paused]" if self.paused else ""),
             "",
-            "position     %s facing %s" % (cave.agent, cave.facing),
-            "score        %d" % cave.score,
-            "gold         %s" % ("carried" if cave.has_gold else "not found"),
-            "arrow        %s" % ("ready" if cave.has_arrow else "spent"),
-            "wumpus       %s" % ("alive" if cave.wumpus_alive else "dead"),
+            "position     %s facing %s" % (terrain.rover, terrain.facing),
+            "score        %d" % terrain.score,
+            "sample       %s" % ("aboard" if terrain.has_sample else "not found"),
+            "charge       %s" % ("ready" if terrain.has_charge else "spent"),
+            "radiation    %s" % ("active" if terrain.source_active else "sealed"),
             "",
             "search",
             "  nodes expanded   %d" % m["nodes_expanded"],
@@ -266,8 +266,8 @@ class Window:
             "  resolution steps %d" % m["resolution_steps"],
             "",
             "map",
-            "  safe unvisited   %d" % safe_left,
-            "  frontier cells   %d" % frontier,
+            "  safe unsurveyed  %d" % safe_left,
+            "  frontier squares %d" % frontier,
             "",
         ]
         if decision:

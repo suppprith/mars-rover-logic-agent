@@ -2,8 +2,8 @@
 
 import unittest
 
-from wumpus import planner
-from wumpus.world import Cave, neighbours
+from rover import planner
+from rover.world import Terrain, neighbours
 
 
 def open_grid(size, blocked=()):
@@ -49,39 +49,39 @@ class Search(unittest.TestCase):
 
 
 class Environment(unittest.TestCase):
-    def test_the_entrance_and_its_neighbours_hold_no_pits(self):
+    def test_the_lander_and_its_neighbours_hold_no_crevasses(self):
         for seed in range(40):
-            cave = Cave(size=6, pit_prob=0.3, seed=seed)
-            self.assertNotIn((0, 0), cave.pits)
+            terrain = Terrain(size=6, hazard_prob=0.3, seed=seed)
+            self.assertNotIn((0, 0), terrain.crevasses)
             for cell in neighbours((0, 0), 6):
-                self.assertNotIn(cell, cave.pits)
+                self.assertNotIn(cell, terrain.crevasses)
 
-    def test_the_gold_is_always_reachable(self):
+    def test_the_sample_is_always_reachable(self):
         for seed in range(40):
-            cave = Cave(size=6, pit_prob=0.25, seed=seed)
-            self.assertTrue(cave._reachable(cave.gold))
+            terrain = Terrain(size=6, hazard_prob=0.25, seed=seed)
+            self.assertTrue(terrain._reachable(terrain.sample))
 
-    def test_the_same_seed_builds_the_same_cave(self):
-        a = Cave(size=6, seed=99)
-        b = Cave(size=6, seed=99)
-        self.assertEqual(a.pits, b.pits)
-        self.assertEqual((a.wumpus, a.gold), (b.wumpus, b.gold))
+    def test_the_same_seed_builds_the_same_map(self):
+        a = Terrain(size=6, seed=99)
+        b = Terrain(size=6, seed=99)
+        self.assertEqual(a.crevasses, b.crevasses)
+        self.assertEqual((a.source, a.sample), (b.source, b.sample))
 
-    def test_walking_into_a_pit_ends_the_run(self):
-        cave = Cave(size=4, pit_prob=0.0, seed=1)
-        cave.pits = {(1, 0)}
-        cave.act("move", (1, 0))
-        self.assertFalse(cave.alive)
-        self.assertLess(cave.score, -1000 + 1)
+    def test_driving_into_a_crevasse_ends_the_run(self):
+        terrain = Terrain(size=4, hazard_prob=0.0, seed=1)
+        terrain.crevasses = {(1, 0)}
+        terrain.act("move", (1, 0))
+        self.assertFalse(terrain.operational)
+        self.assertLess(terrain.score, -1000 + 1)
 
-    def test_the_arrow_only_flies_in_a_straight_line(self):
-        cave = Cave(size=4, pit_prob=0.0, seed=2)
-        cave.wumpus = (0, 3)
-        cave.act("shoot", "east")
-        self.assertTrue(cave.wumpus_alive)
-        cave.has_arrow = True
-        cave.act("shoot", "north")
-        self.assertFalse(cave.wumpus_alive)
+    def test_the_charge_only_travels_in_a_straight_line(self):
+        terrain = Terrain(size=4, hazard_prob=0.0, seed=2)
+        terrain.source = (0, 3)
+        terrain.act("seal", "east")
+        self.assertTrue(terrain.source_active)
+        terrain.has_charge = True
+        terrain.act("seal", "north")
+        self.assertFalse(terrain.source_active)
 
 
 if __name__ == "__main__":

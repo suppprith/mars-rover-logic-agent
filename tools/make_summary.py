@@ -16,7 +16,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-REPO = "https://github.com/suppprith/wumpus-astar-agent"
+REPO = "https://github.com/suppprith/mars-rover-logic-agent"
 
 INK = colors.HexColor("#111111")
 RULE = colors.HexColor("#999999")
@@ -61,13 +61,13 @@ def header():
         "2441647 Rohail Kuriakose Varghese"
     )
     return [
-        p("Wumpus World: a logical agent that plans with A*", title),
+        p("Autonomous Mars Rover: a propositional logic agent", title),
         Spacer(1, 2),
         p(
             "BCA301-5 Artificial Intelligence &nbsp;&middot;&nbsp; AI Express Hackathon "
             "&nbsp;&middot;&nbsp; <b>Group 6</b> &nbsp;&middot;&nbsp; "
-            "Track: knowledge-based agent, propositional and first-order reasoning driving "
-            "A* with dynamic replanning",
+            "Track 2: Autonomous Mars Rover (Unit 3, Propositional Logic Agent), "
+            "with A* replanning over the proved-safe squares",
             sub,
         ),
         Spacer(1, 1.5),
@@ -82,8 +82,8 @@ def peas():
         [
             p("Performance", cellb),
             p(
-                "+1000 for carrying the gold out of the entrance, -1000 for dying, -1 per action, "
-                "-10 for firing the arrow. Secondary measures logged every run: path cost in moves, "
+                "+1000 for docking at the lander with the sample, -1000 for losing the rover, -1 per "
+                "action, -10 for firing the containment charge. Secondary measures logged every run: path cost in moves, "
                 "A* nodes expanded and generated, number of replans, clauses held, resolution steps, "
                 "reasoning time.",
             ),
@@ -91,25 +91,27 @@ def peas():
         [
             p("Environment", cellb),
             p(
-                "6x6 grid cave. Each square outside the entrance and its neighbours holds a pit with "
-                "probability 0.16, plus one wumpus and one bar of gold. Generation retries until the "
-                "gold is reachable without crossing a hazard. Partially observable (percepts are local "
-                "only), deterministic, sequential, static, discrete, single agent.",
+                "6x6 survey grid. Each square outside the lander and its neighbours holds a crevasse "
+                "with probability 0.16, plus one radiation source and one sample cache. Generation "
+                "retries until the sample is reachable without crossing a hazard. Partially observable "
+                "(readings are local only), deterministic, sequential, static, discrete, single agent.",
             ),
         ],
         [
             p("Actuators", cellb),
             p(
-                "Move to an orthogonally adjacent square (north, south, east, west), Grab, "
-                "Shoot in a direction with the single arrow, Climb out at the entrance.",
+                "Drive to an orthogonally adjacent square (north, south, east, west), Collect the "
+                "sample, Seal the radiation source along a bearing with the single containment "
+                "charge, Dock at the lander.",
             ),
         ],
         [
             p("Sensors", cellb),
             p(
-                "Breeze (a pit is adjacent), Stench (the wumpus is adjacent), Glitter (the gold is on "
-                "this square), Scream (the arrow hit), Bump (walked into a wall). Nothing else is "
-                "visible: the agent never sees a square it has not stood on.",
+                "Seismic tremor (a crevasse is adjacent), Geiger reading (the radiation source is "
+                "adjacent), sample beacon (the cache is on this square), telemetry spike (the charge "
+                "sealed the source), bump (drove into the edge). Nothing else is visible: the rover "
+                "never sees a square it has not parked on.",
             ),
         ],
     ]
@@ -121,24 +123,25 @@ def formulation():
         [
             p("State space", cellb),
             p(
-                "Agent state is (position, knowledge base, has_gold, has_arrow, wumpus_alive). The "
+                "Rover state is (position, knowledge base, has_sample, has_charge, source_active). The "
                 "planner searches a smaller graph: vertices are the squares currently proved safe or "
-                "already visited, minus squares proved to hold a pit; edges join orthogonal neighbours. "
-                "That vertex set changes after every percept, which is what forces the replan.",
+                "already driven on, minus squares proved to hold a crevasse; edges join orthogonal "
+                "neighbours. That vertex set changes after every reading, which is what forces the replan.",
             ),
         ],
         [
             p("Initial state", cellb),
             p(
-                "Agent at (0,0) facing east, arrow unused, no gold. KB holds only Visited(0,0) plus the "
-                "adjacency facts for the grid. Nothing about pits, the wumpus or the gold is given.",
+                "Rover at the lander (0,0) facing east, charge unused, no sample. KB holds only "
+                "Visited(0,0) plus the adjacency facts for the grid. Nothing about crevasses, the "
+                "radiation source or the sample cache is given.",
             ),
         ],
         [
             p("Goal test", cellb),
             p(
-                "Episode: Climb executed at (0,0) while has_gold. Search: n = target square, where the "
-                "target is the cheapest safe square not yet visited, or (0,0) once the gold is held.",
+                "Mission: Dock executed at (0,0) while has_sample. Search: n = target square, where the "
+                "target is the cheapest safe square not yet surveyed, or (0,0) once the sample is aboard.",
             ),
         ],
         [
@@ -161,11 +164,11 @@ def formulation():
         [
             p("First-order rules", cellb),
             p(
-                "Visited(c) =&gt; NoPit(c) &nbsp;&middot;&nbsp; Visited(c) =&gt; NoWumpus(c)<br/>"
-                "Visited(c) and NoBreeze(c) and Adjacent(c,n) =&gt; NoPit(n)<br/>"
-                "Visited(c) and NoStench(c) and Adjacent(c,n) =&gt; NoWumpus(n)<br/>"
-                "NoPit(c) and NoWumpus(c) =&gt; Safe(c) &nbsp;&middot;&nbsp; "
-                "WumpusDead and Cell(c) =&gt; NoWumpus(c)<br/>"
+                "Visited(c) =&gt; NoCrevasse(c) &nbsp;&middot;&nbsp; Visited(c) =&gt; NoSource(c)<br/>"
+                "Visited(c) and NoTremor(c) and Adjacent(c,n) =&gt; NoCrevasse(n)<br/>"
+                "Visited(c) and NoGeiger(c) and Adjacent(c,n) =&gt; NoSource(n)<br/>"
+                "NoCrevasse(c) and NoSource(c) =&gt; Safe(c) &nbsp;&middot;&nbsp; "
+                "SourceSealed and Cell(c) =&gt; NoSource(c)<br/>"
                 "Applied by forward chaining to a fixpoint, with unification against the ground "
                 "adjacency facts.",
             ),
@@ -173,11 +176,12 @@ def formulation():
         [
             p("Propositional axioms", cellb),
             p(
-                "B<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of P<sub>n</sub> &nbsp;&nbsp;and"
-                "&nbsp;&nbsp; S<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of W<sub>n</sub> , "
-                "added in CNF the first time a square is seen, together with the unit clauses "
-                "not P<sub>c</sub>, not W<sub>c</sub> for every square walked on and the observed "
-                "B<sub>c</sub> or not B<sub>c</sub>.",
+                "T<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of C<sub>n</sub> &nbsp;&nbsp;and"
+                "&nbsp;&nbsp; G<sub>x,y</sub> &lt;=&gt; OR over n in Adj(x,y) of R<sub>n</sub> , where T is a "
+                "seismic tremor, G a Geiger reading, C a crevasse and R the radiation source. Added in "
+                "CNF the first time a square is seen, together with the unit clauses not C<sub>c</sub>, "
+                "not R<sub>c</sub> for every square driven on and the observed T<sub>c</sub> or not "
+                "T<sub>c</sub>.",
             ),
         ],
         [
@@ -193,12 +197,12 @@ def formulation():
         [
             p("Risk when no proof exists", cellb),
             p(
-                "P(P<sub>c</sub> | evidence) = [ sum of w(m) over the models that satisfy the "
-                "evidence and set P<sub>c</sub> true ] / [ sum of w(m) over every model that "
-                "satisfies the evidence ], where w(m) is the product of p over the true pit "
-                "variables and (1-p) over the false ones, p = 0.16. Enumerated over the unproved frontier "
-                "variables only. The agent steps onto the minimum if it is at or below 0.25, otherwise "
-                "it walks home and climbs out.",
+                "P(C<sub>c</sub> | evidence) = [ sum of w(m) over the models that satisfy the "
+                "evidence and set C<sub>c</sub> true ] / [ sum of w(m) over every model that "
+                "satisfies the evidence ], where w(m) is the product of p over the true crevasse "
+                "variables and (1-p) over the false ones, p = 0.16. Enumerated over the unproved "
+                "frontier variables only. The rover drives onto the minimum if it is at or below "
+                "0.25, otherwise it returns to the lander and docks.",
             ),
         ],
     ]
@@ -207,7 +211,7 @@ def formulation():
 
 def complexity():
     rows = [
-        [p("Component", cellb), p("Theoretical", cellb), p("Observed over 400 caves", cellb)],
+        [p("Component", cellb), p("Theoretical", cellb), p("Observed over 400 maps", cellb)],
         [
             p("A* per search"),
             p(
@@ -215,7 +219,7 @@ def complexity():
                 "consistent heuristic, worst case O(b<sup>d</sup>) = 4<sup>10</sup> without one. "
                 "Space O(N) = 36."
             ),
-            p("3.5 nodes expanded per search, 67.8 per cave over 19.3 replans; 117.4 generated"),
+            p("3.5 nodes expanded per search, 67.8 per map over 19.3 replans; 117.4 generated"),
         ],
         [
             p("Forward chaining"),
@@ -223,7 +227,7 @@ def complexity():
                 "Adjacency is bounded at 4, so the rules have O(n<sup>2</sup>) ground instances. "
                 "O(n<sup>2</sup>) work per pass, O(n<sup>4</sup>) to reach the fixpoint."
             ),
-            p("64 facts derived per cave, 259 ground facts held at the end"),
+            p("64 facts derived per map, 259 ground facts held at the end"),
         ],
         [
             p("Resolution"),
@@ -232,7 +236,7 @@ def complexity():
                 "m = 4n<sup>2</sup> = 144, cut to roughly 52 by the relevance window and then capped "
                 "by the 2500 step budget, so each query is bounded."
             ),
-            p("127.7 queries per cave, 1258 steps per query against the 2500 cap"),
+            p("106.1 queries per map, 1298 steps per query against the 2500 cap"),
         ],
         [
             p("Model counting"),
@@ -246,8 +250,8 @@ def complexity():
             p("Whole episode"),
             p("Turns bounded by the 250 step cap; memory O(n<sup>2</sup>) facts plus O(n<sup>2</sup>) clauses"),
             p(
-                "21.1 turns, 19.3 moves, 190.4 clauses, 260.3 ms of reasoning per cave; "
-                "94.2% survived, 64.5% recovered the gold, mean score 564.2"
+                "21.1 turns, 19.3 moves, 190.4 clauses, 371.4 ms of reasoning per map; "
+                "94.2% of rovers survived, 64.5% recovered the sample, mean score 564.2"
             ),
         ],
     ]
@@ -264,7 +268,7 @@ def build(path):
         rightMargin=14 * mm,
         topMargin=12 * mm,
         bottomMargin=10 * mm,
-        title="Wumpus World logical agent, technical summary",
+        title="Autonomous Mars Rover logical agent, technical summary",
         author="Group 6",
     )
     story = []
@@ -284,8 +288,9 @@ def build(path):
         p(
             "Measurements reproduce with <font face=\"Courier\">python run.py --benchmark 400 "
             "--seed 0</font> on Python 3.11. The recorded demo run is "
-            "<font face=\"Courier\">python run.py --seed 114 --delay 1800</font>: 19 turns, "
-            "16 moves, 47 nodes expanded, 34 resolution queries with 2 proofs, final score 971.",
+            "<font face=\"Courier\">python run.py --seed 114 --delay 1800</font>: resolution proves a crevasse at (2,0), model checking pins the radiation source at "
+            "(1,1), 19 turns, 16 moves, 47 nodes expanded, 34 resolution queries with 2 proofs, "
+            "final score 971.",
             body,
         )
     )

@@ -1,15 +1,15 @@
 """A small first-order forward chainer.
 
-Only what the cave needs: definite clauses, constants and variables, no
+Only what the survey needs: definite clauses, constants and variables, no
 functions. Terms are plain strings; a string starting with "?" is a
 variable. A literal is a tuple (predicate, term, term, ...).
 
-    Visited(?c) and NoBreeze(?c) and Adjacent(?c, ?n)  =>  NoPit(?n)
+    Visited(?c) and NoTremor(?c) and Adjacent(?c, ?n)  =>  NoCrevasse(?n)
 
 is written as
 
-    Rule([("Visited", "?c"), ("NoBreeze", "?c"), ("Adjacent", "?c", "?n")],
-         ("NoPit", "?n"))
+    Rule([("Visited", "?c"), ("NoTremor", "?c"), ("Adjacent", "?c", "?n")],
+         ("NoCrevasse", "?n"))
 
 Forward chaining runs to a fixpoint. Every derived fact keeps the rule
 name and the bindings that produced it, so the agent can print the
@@ -122,28 +122,28 @@ class FolKB:
                 yield from self._match(premises, index + 1, merged)
 
 
-# The knowledge engineering part: the cave rules written once, in FOL.
-CAVE_RULES = [
-    Rule([("Visited", "?c")], ("NoPit", "?c"), "R1 visited cells hold no pit"),
-    Rule([("Visited", "?c")], ("NoWumpus", "?c"), "R2 visited cells hold no wumpus"),
+# The knowledge engineering part: the terrain rules written once, in FOL.
+TERRAIN_RULES = [
+    Rule([("Visited", "?c")], ("NoCrevasse", "?c"), "R1 a square already driven holds no crevasse"),
+    Rule([("Visited", "?c")], ("NoSource", "?c"), "R2 a square already driven holds no radiation"),
     Rule(
-        [("Visited", "?c"), ("NoBreeze", "?c"), ("Adjacent", "?c", "?n")],
-        ("NoPit", "?n"),
-        "R3 no breeze means no pit next door",
+        [("Visited", "?c"), ("NoTremor", "?c"), ("Adjacent", "?c", "?n")],
+        ("NoCrevasse", "?n"),
+        "R3 no tremor means no crevasse next door",
     ),
     Rule(
-        [("Visited", "?c"), ("NoStench", "?c"), ("Adjacent", "?c", "?n")],
-        ("NoWumpus", "?n"),
-        "R4 no stench means no wumpus next door",
+        [("Visited", "?c"), ("NoGeiger", "?c"), ("Adjacent", "?c", "?n")],
+        ("NoSource", "?n"),
+        "R4 a clean Geiger reading clears the neighbours",
     ),
     Rule(
-        [("NoPit", "?c"), ("NoWumpus", "?c")],
+        [("NoCrevasse", "?c"), ("NoSource", "?c")],
         ("Safe", "?c"),
-        "R5 a cell with neither hazard is safe",
+        "R5 a square with neither hazard is safe",
     ),
     Rule(
-        [("WumpusDead", "yes"), ("Cell", "?c")],
-        ("NoWumpus", "?c"),
-        "R6 a dead wumpus threatens nothing",
+        [("SourceSealed", "yes"), ("Cell", "?c")],
+        ("NoSource", "?c"),
+        "R6 a sealed source emits nothing anywhere",
     ),
 ]

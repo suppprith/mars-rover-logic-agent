@@ -1,13 +1,13 @@
-"""A* over the cells the agent currently believes are safe.
+"""A* over the squares the rover currently believes are safe.
 
-The graph is the grid: nodes are cells, edges join orthogonal neighbours,
-every edge costs one move. The heuristic is Manhattan distance, which
-never overestimates on a 4-connected unit-cost grid, so A* returns an
-optimal path and the usual optimality argument holds.
+The graph is the grid: nodes are squares, edges join orthogonal
+neighbours, every edge costs one move. The heuristic is Manhattan
+distance, which never overestimates on a 4-connected unit-cost grid, so
+A* returns an optimal path and the usual optimality argument holds.
 
 The passable set changes every time the knowledge base learns something,
-which is why the agent replans from scratch after each percept instead of
-following a route it planned earlier.
+which is why the rover replans from scratch after each sensor reading
+instead of following a route it planned earlier.
 """
 
 import heapq
@@ -37,10 +37,10 @@ class Result:
 
 
 def astar(start, goal, passable, size):
-    """Shortest route from start to goal through cells in `passable`.
+    """Shortest route from start to goal through squares in `passable`.
 
     `start` is always allowed even if it is not in `passable`, since the
-    agent has to plan from wherever it is standing.
+    rover has to plan from wherever it is parked.
     """
     if start == goal:
         return Result([start], 0, 0, 1)
@@ -81,7 +81,7 @@ def nearest(start, goals, passable, size):
     """Cheapest reachable goal out of a set, and the route to it.
 
     Runs one A* search per candidate and keeps the best. The candidate
-    list is the safe unvisited frontier, so it stays small.
+    list is the safe unsurveyed frontier, so it stays small.
     """
     best = None
     expanded = 0

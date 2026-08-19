@@ -1,15 +1,15 @@
-"""What the agent believes, and how it gets there.
+"""What the rover believes, and how it gets there.
 
 Three reasoning layers sit behind one interface:
 
-  * A first-order forward chainer holds the cave rules and grinds out the
-    easy conclusions, mostly "no breeze here so nothing next door".
-  * Resolution proves the harder pit questions, the ones where a breeze
-    is only explained away once you combine several observations.
-  * Model checking pins the wumpus down, since there is exactly one of it
-    and enumerating its possible cells is cheap.
+  * A first-order forward chainer holds the terrain rules and grinds out
+    the easy conclusions, mostly "no tremor here so nothing next door".
+  * Resolution proves the harder crevasse questions, the ones where a
+    tremor is only explained away once several readings are combined.
+  * Model checking pins the radiation source down, since there is exactly
+    one of it and enumerating its possible squares is cheap.
 
-Everything the agent later prints as a reason comes from here.
+Everything the rover later prints as a reason comes from here.
 """
 
 from . import fol
@@ -17,39 +17,39 @@ from . import logic
 from .world import neighbours
 
 
-def pit(cell):
-    return "P%d,%d" % cell
+def crevasse(cell):
+    return "C%d,%d" % cell
 
 
-def wumpus(cell):
-    return "W%d,%d" % cell
+def source(cell):
+    return "R%d,%d" % cell
 
 
-def breeze(cell):
-    return "B%d,%d" % cell
+def tremor(cell):
+    return "T%d,%d" % cell
 
 
-def stench(cell):
-    return "S%d,%d" % cell
+def geiger(cell):
+    return "G%d,%d" % cell
 
 
 class KnowledgeBase:
-    def __init__(self, size, pit_prior=0.16, focus_radius=2):
+    def __init__(self, size, hazard_prior=0.16, focus_radius=2):
         self.size = size
-        self.pit_prior = pit_prior
+        self.hazard_prior = hazard_prior
         self.focus_radius = focus_radius
         self.cells = [(x, y) for x in range(size) for y in range(size)]
 
-        self.fol = fol.FolKB(fol.CAVE_RULES)
+        self.fol = fol.FolKB(fol.TERRAIN_RULES)
         self.prover = logic.Prover()
         self.clauses = []
 
         self.visited = set()
-        self.breezy = set()
-        self.calm = set()
-        self.smelly = set()
-        self.fresh = set()
-        self.wumpus_dead = False
+        self.trembling = set()
+        self.steady = set()
+        self.irradiated = set()
+        self.clean = set()
+        self.source_sealed = False
         self.axiom_cells = set()
         self.proved = {}
         self.attempted = {}
@@ -75,7 +75,7 @@ class KnowledgeBase:
     def perceive(self, cell, percepts):
         """Record one round of percepts and re-run every reasoner.
 
-        Returns the lines worth printing: fresh conclusions only, so the
+        Returns the lines worth printing: clean conclusions only, so the
         console log shows the knowledge base actually growing rather than
         repeating itself.
         """
@@ -83,33 +83,35 @@ class KnowledgeBase:
         self.visited.add(cell)
         self.fol.tell(("Visited", self._name(cell)), "walked there")
 
-        if percepts.get("scream"):
-            self.wumpus_dead = True
-            self.fol.tell(("WumpusDead", "yes"), "heard the scream")
-            notes.append("scream heard, the wumpus is dead and every cell is clear of it")
+        if percepts.get("spike"):
+            self.source_sealed = True
+            self.fol.tell(("SourceSealed", "yes"), "telemetry spike confirmed the seal")
+            notes.append(
+                "telemetry spike: the source is sealed, every square is clear of it"
+            )
 
-        if percepts["breeze"]:
-            self.breezy.add(cell)
-            self.fol.tell(("Breeze", self._name(cell)), "felt a breeze")
+        if percepts["tremor"]:
+            self.trembling.add(cell)
+            self.fol.tell(("Tremor", self._name(cell)), "felt a tremor")
         else:
-            self.calm.add(cell)
-            self.fol.tell(("NoBreeze", self._name(cell)), "no breeze")
+            self.steady.add(cell)
+            self.fol.tell(("NoTremor", self._name(cell)), "no tremor")
 
-        if percepts["stench"]:
-            self.smelly.add(cell)
-            self.fol.tell(("Stench", self._name(cell)), "smelled a stench")
+        if percepts["geiger"]:
+            self.irradiated.add(cell)
+            self.fol.tell(("Geiger", self._name(cell)), "smelled a geiger")
         else:
-            self.fresh.add(cell)
-            self.fol.tell(("NoStench", self._name(cell)), "no stench")
+            self.clean.add(cell)
+            self.fol.tell(("NoGeiger", self._name(cell)), "no geiger")
 
         self._add_axioms(cell)
-        self.clauses.append(logic.clause(logic.neg(pit(cell))))
-        self.clauses.append(logic.clause(logic.neg(wumpus(cell))))
+        self.clauses.append(logic.clause(logic.neg(crevasse(cell))))
+        self.clauses.append(logic.clause(logic.neg(source(cell))))
         self.clauses.append(
-            logic.clause(breeze(cell) if percepts["breeze"] else logic.neg(breeze(cell)))
+            logic.clause(tremor(cell) if percepts["tremor"] else logic.neg(tremor(cell)))
         )
         self.clauses.append(
-            logic.clause(stench(cell) if percepts["stench"] else logic.neg(stench(cell)))
+            logic.clause(geiger(cell) if percepts["geiger"] else logic.neg(geiger(cell)))
         )
 
         before = set(self.fol.facts)
@@ -117,18 +119,18 @@ class KnowledgeBase:
         notes.extend(self._report(self.fol.facts - before))
 
         notes.extend(self._prove_frontier())
-        notes.extend(self._locate_wumpus())
+        notes.extend(self._locate_source())
         return notes
 
     def _report(self, new_facts, limit=5):
         """Turn a batch of derived facts into a few readable lines.
 
-        Only Safe and Pit conclusions are worth printing. The NoPit and
-        NoWumpus steps behind them show up inside the explanation, and a
-        single scream can derive thirty of those at once, which buries
+        Only Safe and Crevasse conclusions are worth printing. The NoCrevasse and
+        NoSource steps behind them show up inside the explanation, and a
+        single spike can derive thirty of those at once, which buries
         the log for no gain.
         """
-        picked = sorted(f for f in new_facts if f[0] in ("Safe", "Pit"))
+        picked = sorted(f for f in new_facts if f[0] in ("Safe", "Crevasse"))
         lines = [self._explain(f) for f in picked[:limit]]
         if len(picked) > limit:
             lines.append("and %d more cells settled the same way" % (len(picked) - limit))
@@ -139,7 +141,7 @@ class KnowledgeBase:
         if fact[0] != "Safe":
             return "%s(%s) because %s" % (fact[0], name, self.fol.why(fact))
         parts = []
-        for premise in ("NoPit", "NoWumpus"):
+        for premise in ("NoCrevasse", "NoSource"):
             reason = self.fol.why((premise, name))
             parts.append("%s from %s" % (premise, reason.split(" applied to ")[0]))
         return "Safe(%s): %s" % (name, ", ".join(parts))
@@ -150,8 +152,8 @@ class KnowledgeBase:
             return
         self.axiom_cells.add(cell)
         adj = neighbours(cell, self.size)
-        self.clauses.extend(logic.biconditional_clauses(breeze(cell), [pit(n) for n in adj]))
-        self.clauses.extend(logic.biconditional_clauses(stench(cell), [wumpus(n) for n in adj]))
+        self.clauses.extend(logic.biconditional_clauses(tremor(cell), [crevasse(n) for n in adj]))
+        self.clauses.extend(logic.biconditional_clauses(geiger(cell), [source(n) for n in adj]))
 
     # ---- asking -----------------------------------------------------
 
@@ -161,7 +163,7 @@ class KnowledgeBase:
         r = self.focus_radius
         for other in self.cells:
             if abs(other[0] - cell[0]) + abs(other[1] - cell[1]) <= r:
-                out.update((pit(other), wumpus(other), breeze(other), stench(other)))
+                out.update((crevasse(other), source(other), tremor(other), geiger(other)))
         return out
 
     def _prove_frontier(self):
@@ -169,8 +171,8 @@ class KnowledgeBase:
         notes = []
         for cell in sorted(self.frontier()):
             key = ("nopit", cell)
-            settled = self.fol.holds(("NoPit", self._name(cell))) or self.fol.holds(
-                ("Pit", self._name(cell))
+            settled = self.fol.holds(("NoCrevasse", self._name(cell))) or self.fol.holds(
+                ("Crevasse", self._name(cell))
             )
             if self.proved.get(key) or settled:
                 continue
@@ -180,48 +182,48 @@ class KnowledgeBase:
                 continue
             self.attempted[cell] = len(self.clauses)
             focus = self._focus(cell)
-            if self.prover.entails(self.clauses, logic.neg(pit(cell)), focus):
+            if self.prover.entails(self.clauses, logic.neg(crevasse(cell)), focus):
                 self.proved[key] = True
-                self.fol.tell(("NoPit", self._name(cell)), "resolution refutation")
-                notes.append("resolution proves no pit at %s" % (cell,))
-            elif self.prover.entails(self.clauses, pit(cell), focus):
-                self.proved[("pit", cell)] = True
-                self.fol.tell(("Pit", self._name(cell)), "resolution refutation")
-                notes.append("resolution proves a pit at %s, that cell is off limits" % (cell,))
+                self.fol.tell(("NoCrevasse", self._name(cell)), "resolution refutation")
+                notes.append("resolution proves no crevasse at %s" % (cell,))
+            elif self.prover.entails(self.clauses, crevasse(cell), focus):
+                self.proved[("crevasse", cell)] = True
+                self.fol.tell(("Crevasse", self._name(cell)), "resolution refutation")
+                notes.append("resolution proves a crevasse at %s, that square is off limits" % (cell,))
         if notes:
             self.fol.forward_chain()
         return notes
 
-    def _locate_wumpus(self):
-        """Model checking over the one and only wumpus.
+    def _locate_source(self):
+        """Model checking over the one and only rover.
 
-        Every cell that survives all the stench and no-stench reports is a
+        Every cell that survives all the geiger and no-geiger reports is a
         candidate. One survivor means the location is known.
         """
-        if self.wumpus_dead:
+        if self.source_sealed:
             return []
-        candidates = [c for c in self.cells if self._wumpus_possible(c)]
-        if len(candidates) == 1 and not self.fol.holds(("Wumpus", self._name(candidates[0]))):
+        candidates = [c for c in self.cells if self._source_possible(c)]
+        if len(candidates) == 1 and not self.fol.holds(("Source", self._name(candidates[0]))):
             spot = candidates[0]
-            self.fol.tell(("Wumpus", self._name(spot)), "only cell left after model checking")
+            self.fol.tell(("Source", self._name(spot)), "the only square left after model checking")
             self.fol.forward_chain()
-            return ["model checking pins the wumpus at %s" % (spot,)]
+            return ["model checking pins the radiation source at %s" % (spot,)]
         return []
 
-    def _wumpus_possible(self, cell):
+    def _source_possible(self, cell):
         if cell in self.visited:
             return False
-        for seen in self.smelly:
+        for seen in self.irradiated:
             if cell not in neighbours(seen, self.size):
                 return False
-        for seen in self.fresh:
+        for seen in self.clean:
             if cell in neighbours(seen, self.size):
                 return False
         return True
 
-    def wumpus_location(self):
-        found = self.fol.query("Wumpus")
-        if len(found) == 1 and not self.wumpus_dead:
+    def source_location(self):
+        found = self.fol.query("Source")
+        if len(found) == 1 and not self.source_sealed:
             return self._cell(next(iter(found))[1])
         return None
 
@@ -231,8 +233,8 @@ class KnowledgeBase:
     def safe_cells(self):
         return {self._cell(f[1]) for f in self.fol.query("Safe")}
 
-    def known_pits(self):
-        return {self._cell(f[1]) for f in self.fol.query("Pit")}
+    def known_crevasses(self):
+        return {self._cell(f[1]) for f in self.fol.query("Crevasse")}
 
     def frontier(self):
         """Unvisited cells that touch somewhere the agent has already been."""
@@ -247,7 +249,7 @@ class KnowledgeBase:
         return sorted(self.safe_cells() - self.visited)
 
     def why(self, cell):
-        for predicate in ("Safe", "Pit", "Wumpus", "NoPit", "NoWumpus"):
+        for predicate in ("Safe", "Crevasse", "Source", "NoCrevasse", "NoSource"):
             fact = (predicate, self._name(cell))
             if self.fol.holds(fact):
                 return "%s: %s" % (predicate, self.fol.why(fact))
@@ -255,44 +257,44 @@ class KnowledgeBase:
 
     # ---- gambling ---------------------------------------------------
 
-    def pit_risk(self):
-        """Rough chance of a pit for each frontier cell with no proof.
+    def crevasse_risk(self):
+        """Rough chance of a crevasse for each frontier cell with no proof.
 
-        Counts the satisfying assignments of the frontier pit variables
-        against the breeze reports and reports how often each cell comes
-        out holding a pit. When the frontier is too wide to enumerate it
-        falls back on counting breezy neighbours, which orders the cells
+        Counts the satisfying assignments of the frontier crevasse variables
+        against the tremor reports and reports how often each cell comes
+        out holding a crevasse. When the frontier is too wide to enumerate it
+        falls back on counting trembling neighbours, which orders the cells
         the same way most of the time and costs nothing.
         """
         unknown = [
             c
             for c in sorted(self.frontier())
-            if not self.fol.holds(("NoPit", self._name(c)))
-            and not self.fol.holds(("Pit", self._name(c)))
+            if not self.fol.holds(("NoCrevasse", self._name(c)))
+            and not self.fol.holds(("Crevasse", self._name(c)))
         ]
         if not unknown:
             return {}
 
-        index = {cell: pit(cell) for cell in unknown}
+        index = {cell: crevasse(cell) for cell in unknown}
         constraints = []
         for seen in self.visited:
             adj = neighbours(seen, self.size)
             free = [index[n] for n in adj if n in index]
-            settled = any(self.fol.holds(("Pit", self._name(n))) for n in adj)
-            if seen in self.breezy:
+            settled = any(self.fol.holds(("Crevasse", self._name(n))) for n in adj)
+            if seen in self.trembling:
                 if not settled and free:
                     constraints.append(lambda a, group=tuple(free): any(a[s] for s in group))
             else:
                 if free:
                     constraints.append(lambda a, group=tuple(free): not any(a[s] for s in group))
 
-        scores = logic.model_count(index.values(), constraints, self.pit_prior)
+        scores = logic.model_count(index.values(), constraints, self.hazard_prior)
         if scores:
             return {cell: scores[index[cell]] for cell in unknown}
 
         fallback = {}
         for cell in unknown:
-            witnesses = sum(1 for n in neighbours(cell, self.size) if n in self.breezy)
+            witnesses = sum(1 for n in neighbours(cell, self.size) if n in self.trembling)
             fallback[cell] = min(0.9, 0.25 * witnesses) if witnesses else 0.1
         return fallback
 

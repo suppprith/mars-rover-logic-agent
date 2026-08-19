@@ -1,19 +1,20 @@
-"""The agent: perceive, update the knowledge base, replan, act.
+"""The rover: read the sensors, update the knowledge base, replan, act.
 
 Priority order for each turn:
 
-  1. Gold underfoot, take it.
-  2. Carrying the gold, walk the shortest safe route home and climb out.
-  3. Somewhere proved safe and not yet visited, go there.
-  4. Nothing safe left but the wumpus is pinned down and the arrow is
-     unused, shoot it and see whether that opens the map up.
-  5. Still stuck, take the least risky unproved cell if the odds are
-     tolerable.
-  6. Otherwise cut the losses and climb out.
+  1. Sample cache on this square, collect it.
+  2. Carrying the sample, drive the shortest safe route back and dock.
+  3. Somewhere proved safe and not yet surveyed, go there.
+  4. Nothing safe left but the radiation source is pinned down and the
+     containment charge is unused, seal it and see whether that opens the
+     map up.
+  5. Still stuck, drive onto the least risky unproved square if the odds
+     are tolerable.
+  6. Otherwise cut the losses and dock with nothing.
 
-The plan is thrown away and rebuilt after every percept. That is the
-point of the exercise: the map the agent is searching over is the set of
-cells it has proved safe, and that set grows as it walks.
+The plan is thrown away and rebuilt after every reading. That is the
+whole point: the graph the rover searches is the set of squares it has
+proved safe, and that set grows as it drives.
 """
 
 import time
@@ -34,14 +35,14 @@ class Decision:
 
 
 class Agent:
-    def __init__(self, size, risk_limit=RISK_LIMIT, pit_prior=0.16):
+    def __init__(self, size, risk_limit=RISK_LIMIT, hazard_prior=0.16):
         self.size = size
         self.risk_limit = risk_limit
-        self.kb = KnowledgeBase(size, pit_prior=pit_prior)
+        self.kb = KnowledgeBase(size, hazard_prior=hazard_prior)
 
         self.position = START
-        self.has_gold = False
-        self.has_arrow = True
+        self.has_sample = False
+        self.has_charge = True
         self.plan = []
         self.goal = None
         self.notes = []
@@ -68,27 +69,27 @@ class Agent:
         return decision
 
     def _decide(self, percepts):
-        if percepts["glitter"]:
-            self.has_gold = True
+        if percepts["signal"]:
+            self.has_sample = True
             self.goal = None
-            return Decision("grab", None, "glitter underfoot")
+            return Decision("collect", None, "the sample cache is on this square")
 
-        if self.has_gold:
-            return self._head_home("carrying the gold, heading for the exit")
+        if self.has_sample:
+            return self._head_home("carrying the sample, heading back to the lander")
 
         target = self._pick_target()
         if target is not None:
             cell, result = target
             self.goal = cell
             self.plan = result.path[1:]
-            reason = "nearest safe cell not seen yet is %s, A* cost %d over %d expansions" % (
+            reason = "nearest safe square not surveyed yet is %s, A* cost %d over %d expansions" % (
                 cell,
                 result.cost,
                 result.expanded,
             )
             return Decision("move", self.plan[0], reason, result.path)
 
-        shot = self._consider_shooting()
+        shot = self._consider_sealing()
         if shot is not None:
             return shot
 
@@ -96,13 +97,13 @@ class Agent:
         if gamble is not None:
             return gamble
 
-        return self._head_home("nothing safe left to try, climbing out")
+        return self._head_home("nothing safe left to try, returning to the lander")
 
     # ---- options ----------------------------------------------------
 
     def _passable(self):
         """Cells A* is allowed to route through."""
-        return (self.kb.safe_cells() | self.kb.visited) - self.kb.known_pits()
+        return (self.kb.safe_cells() | self.kb.visited) - self.kb.known_crevasses()
 
     def _pick_target(self):
         candidates = [c for c in self.kb.unexplored_safe() if c != self.position]
@@ -116,35 +117,35 @@ class Agent:
 
     def _head_home(self, reason):
         if self.position == START:
-            return Decision("climb", None, reason)
+            return Decision("dock", None, reason)
         result = planner.astar(self.position, START, self._passable(), self.size)
         self._count(result)
         if not result.found or len(result.path) < 2:
-            return Decision("climb", None, "no route home, trying to climb from here")
+            return Decision("dock", None, "no route back, attempting to dock from here")
         self.goal = START
         self.plan = result.path[1:]
         full = "%s, A* cost %d over %d expansions" % (reason, result.cost, result.expanded)
         return Decision("move", self.plan[0], full, result.path)
 
-    def _consider_shooting(self):
-        if not self.has_arrow or self.kb.wumpus_dead:
+    def _consider_sealing(self):
+        if not self.has_charge or self.kb.source_sealed:
             return None
-        spot = self.kb.wumpus_location()
+        spot = self.kb.source_location()
         if spot is None:
             return None
-        direction = self._line_of_fire(spot)
+        direction = self._line_of_sight(spot)
         if direction is None:
             return None
-        self.has_arrow = False
+        self.has_charge = False
         self.goal = spot
         return Decision(
-            "shoot",
+            "seal",
             direction,
-            "wumpus proved to sit at %s and it is straight %s of me" % (spot, direction),
+            "the radiation source is proved to sit at %s, straight %s of here" % (spot, direction),
             [self.position, spot],
         )
 
-    def _line_of_fire(self, spot):
+    def _line_of_sight(self, spot):
         x, y = self.position
         tx, ty = spot
         if x == tx:
@@ -154,10 +155,10 @@ class Agent:
         return None
 
     def _consider_risk(self):
-        risk = self.kb.pit_risk()
+        risk = self.kb.crevasse_risk()
         reachable = {}
         for cell, score in risk.items():
-            if self.kb.fol.holds(("Wumpus", self.kb._name(cell))) and not self.kb.wumpus_dead:
+            if self.kb.fol.holds(("Source", self.kb._name(cell))) and not self.kb.source_sealed:
                 continue
             if any(n in self.kb.visited for n in neighbours(cell, self.size)):
                 reachable[cell] = score
@@ -175,7 +176,7 @@ class Agent:
 
         self.goal = cell
         self.plan = result.path[1:]
-        reason = "nothing proved safe, %s carries the lowest pit estimate at %.0f%%" % (
+        reason = "nothing proved safe, %s carries the lowest crevasse estimate at %.0f%%" % (
             cell,
             score * 100,
         )
